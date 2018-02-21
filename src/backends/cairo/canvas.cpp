@@ -13,37 +13,21 @@
 #include <fontconfig/fcfreetype.h>
 #include <harfbuzz/hb.h>
 #include <harfbuzz/hb-ft.h>
+#include <unicode/unistr.h>
+#include <unicode/uscript.h>
+#include <unicode/ubidi.h>
+
+#include "scrptrun.h"
+
 #endif
 
 #include <mutex>
+#include <iostream>
 
 using namespace std;
 
 namespace xg {
 namespace detail {
-/*
-
-PDFSurface::PDFSurface(const std::string &fileName, double w, double h, int dpi): Surface(w, h), dpi_(dpi)
-{
-    handle_ = cairo_pdf_surface_create(fileName.c_str(), w, h) ;
-}
-
-PSSurface::PSSurface(const std::string &fileName, double w, double h, int dpi): Surface(w, h), dpi_(dpi)
-{
-    handle_ = cairo_pdf_surface_create(fileName.c_str(), w, h) ;
-}
-
-PatternSurface::PatternSurface(double w, double h): Surface(w, h)
-{
-    cairo_rectangle_t rect = { 0, 0, w, h } ;
-
-    handle_ = cairo_recording_surface_create(CAIRO_CONTENT_COLOR_ALPHA, &rect) ;
-}
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-*/
-
 
 Backend::State::State(): font_("Arial", 10) {
 
@@ -53,9 +37,6 @@ Backend::Backend() {
     State st ;
     state_.push(std::move(st)) ;
 }
-
-
-
 
 void Backend::set_cairo_stroke(const Pen &pen) {
     cairo_t *cr = (cairo_t *)cr_  ;
@@ -375,6 +356,13 @@ public:
         return s_instance ;
     }
 
+    cairo_font_face_t *query_font_face_fc(const std::string &family_name, FontStyle font_style, FontWeight font_weight) ;
+
+private:
+
+    static string font_face_key(const string &family_name, FontStyle font_style, FontWeight font_weight) ;
+
+
     std::map<string, cairo_font_face_t *> cache_ ;
     std::mutex mx_ ;
 };
@@ -422,35 +410,40 @@ static cairo_font_face_t *query_font_face(const std::string &familyName, FontSty
 
 #else
 
-
-static cairo_font_face_t *query_font_face_fc(const std::string &family_name, FontStyle font_style, FontWeight font_weight)
-{
+string CairoFontFaceCache::font_face_key(const string &family_name, FontStyle font_style, FontWeight font_weight) {
     string key = family_name  + '-' ;
 
     switch ( font_style )
     {
-    case NormalFontStyle:
+    case FontStyle::Normal:
         key += "normal-" ;
         break ;
-    case ObliqueFontStyle:
+    case FontStyle::Oblique:
         key += "oblique-" ;
         break ;
-    case ItalicFontStyle:
+    case FontStyle::Italic:
         key += "italic-" ;
         break ;
     }
 
     switch ( font_weight )
     {
-    case NormalFontWeight:
+    case FontWeight::Normal:
         key += "normal" ;
         break ;
-    case BoldFontWeight:
+    case FontWeight::Bold:
         key += "bold" ;
         break ;
     }
 
-    cairo_font_face_t *face = CairoFontFaceCache::instance().find(key) ;
+    return key ;
+}
+
+cairo_font_face_t *CairoFontFaceCache::query_font_face_fc(const std::string &family_name, FontStyle font_style, FontWeight font_weight)
+{
+    string key = font_face_key(family_name, font_style, font_weight) ;
+
+    cairo_font_face_t *face = find(key) ;
 
     if ( face ) return face ;
 
@@ -458,17 +451,20 @@ static cairo_font_face_t *query_font_face_fc(const std::string &family_name, Fon
 
     FcPatternAddString(pat, FC_FAMILY, (const FcChar8*)(family_name.c_str()));
 
-    if ( font_style == ItalicFontStyle )
+    if ( font_style == FontStyle::Italic )
         FcPatternAddInteger(pat, FC_SLANT, FC_SLANT_ITALIC) ;
-    else if ( font_style == ObliqueFontStyle )
+    else if ( font_style == FontStyle::Oblique )
         FcPatternAddInteger(pat, FC_SLANT, FC_SLANT_OBLIQUE) ;
     else
         FcPatternAddInteger(pat, FC_SLANT, FC_SLANT_ROMAN) ;
 
-    if ( font_weight == BoldFontWeight )
+    if ( font_weight == FontWeight::Bold )
         FcPatternAddInteger(pat, FC_WEIGHT, FC_WEIGHT_BOLD) ;
     else
         FcPatternAddInteger(pat, FC_WEIGHT, FC_WEIGHT_NORMAL) ;
+
+    FcPatternAddBool(pat, FC_SCALABLE, FcTrue);
+
 
     cairo_font_options_t *font_options =  cairo_font_options_create ();
 
@@ -477,20 +473,37 @@ static cairo_font_face_t *query_font_face_fc(const std::string &family_name, Fon
 
     cairo_ft_font_options_substitute(font_options, pat) ;
 
-    face = cairo_ft_font_face_create_for_pattern(pat) ;
+    FcConfigSubstitute(0, pat, FcMatchPattern);
+    FcDefaultSubstitute(pat);
+
+    FcChar8* fontConfigFamilyNameAfterConfiguration;
+    FcPatternGetString(pat, FC_FAMILY, 0, &fontConfigFamilyNameAfterConfiguration);
+
+    FcResult fontConfigResult;
+    FcPattern *resultPattern = FcFontMatch(0, pat, &fontConfigResult);
+    if (!resultPattern) // No match.
+        return 0;
+
+    FcChar8* fontConfigFamilyNameAfterMatching;
+    FcPatternGetString(resultPattern, FC_FAMILY, 0, &fontConfigFamilyNameAfterMatching);
+
+
+    face = cairo_ft_font_face_create_for_pattern(resultPattern) ;
 
     cairo_font_options_destroy(font_options) ;
 
     FcPatternDestroy(pat) ;
 
-    CairoFontFaceCache::instance().save(key, face) ;
+    FcPatternDestroy(resultPattern) ;
+
+    save(key, face) ;
 
     return face ;
 }
 
 cairo_scaled_font_t *cairo_setup_font(const string &family_name, FontStyle font_style, FontWeight font_weight, double font_size)
 {
-    cairo_font_face_t *face = query_font_face_fc(family_name, font_style, font_weight) ;
+    cairo_font_face_t *face = CairoFontFaceCache::instance().query_font_face_fc(family_name, font_style, font_weight) ;
 
     // create scaled font
 
@@ -570,21 +583,549 @@ static bool shape_text(const std::string &text, cairo_scaled_font_t *sf, cairo_g
 
     hb_buffer_destroy(buffer) ;
 }
+
+
+//
+
+
+class TextLayout {
+public:
+    TextLayout(const string &text, const Font &font) ;
+
+    bool run() ;
+
+    bool breakLines() ;
+
+private:
+
+
+    struct TextItem {
+        uint start_ ;
+        uint end_ ;
+        hb_script_t script_ ;
+        string lang_ ;
+        hb_direction_t dir_ ;
+    } ;
+
+    struct GlyphInfo {
+
+
+    };
+
+    struct TextLine {
+
+        TextLine(int32_t first, int32_t last): first_(first), last_(last) {}
+
+        double line_height_; // Includes line spacing (returned by freetype)
+        double max_char_height_; // Max height of any glyphs in line - calculated by shaper
+        double width_;
+        double glyphs_width_;
+        int32_t first_;
+        int32_t last_;
+        bool first_line_;
+        unsigned space_count_;
+        vector<GlyphInfo> glyphs_ ;
+    } ;
+
+
+    static hb_direction_t icu_direction_to_hb(UBiDiDirection direction) {
+        return (direction == UBIDI_RTL) ? HB_DIRECTION_RTL : HB_DIRECTION_LTR;
+    }
+
+    using DirectionRun = std::tuple<hb_direction_t, uint, uint> ;
+    using LangScriptRun = std::tuple<hb_script_t, uint, uint> ;
+
+    bool itemize(int32_t start, int32_t end, vector<TextItem> &items) ;
+    bool itemizeBiDi(vector<DirectionRun> &d_runs, int32_t start, int32_t end) ;
+    bool itemizeScript(vector<LangScriptRun> &runs) ;
+    void mergeRuns(const vector<LangScriptRun> &script_runs, const vector<DirectionRun> &dir_runs, vector<TextItem> &items) ;
+    void breakLine(int32_t start, int32_t end) ;
+    bool shape(TextLine &line) ;
+
+private:
+    UnicodeString us_ ;
+    const Font &font_ ;
+} ;
+
+
+
+bool TextLayout::itemizeBiDi(vector<DirectionRun> &d_runs, int32_t s_begin, int32_t s_end) {
+
+    int32_t s_length = s_end - s_begin ;
+    // Adapted from https://github.com/asmaAL-Bahanta/icu-BiDi-Example/blob/master/bidiExample.cpp
+
+    std::unique_ptr<UBiDi, decltype(&ubidi_close)> bidi(ubidi_open(), ubidi_close) ;
+    UErrorCode error_code = U_ZERO_ERROR;
+    UBiDiLevel para_level= UBIDI_DEFAULT_LTR;
+
+    // initialize algorithm with string
+    ubidi_setPara(bidi.get(), us_.getBuffer() + s_begin, s_length, para_level, nullptr, &error_code);
+
+    if ( U_SUCCESS(error_code) ) {
+        UBiDiDirection direction = ubidi_getDirection(bidi.get());
+        // if the string has a unique direction we are done
+        if ( direction != UBIDI_MIXED )
+            d_runs.emplace_back(icu_direction_to_hb(direction), s_begin, s_end);
+        else {
+            // enumerate detected directions
+            int32_t count = ubidi_countRuns(bidi.get(), &error_code);
+
+            if ( U_SUCCESS(error_code) ) {
+                for( int32_t i=0; i<count; i++ ) {
+                    int32_t run_start, run_length;
+
+                    UBiDiDirection dir = ubidi_getVisualRun(bidi.get(), i, &run_start, &run_length);
+
+                    run_start += s_begin ;
+
+                    d_runs.emplace_back(icu_direction_to_hb(dir), run_start, run_start + run_length);
+                }
+            }
+            else return false ;
+        }
+    }
+    else
+        return false ;
+
+    return true ;
+}
+
+
+
+bool TextLayout::itemizeScript(vector<LangScriptRun> &runs) {
+
+    ScriptRun script_run(us_.getBuffer(), us_.length());
+
+    while ( script_run.next() ) {
+        int32_t run_start = script_run.getScriptStart();
+        int32_t run_end = script_run.getScriptEnd();
+        UScriptCode run_code = script_run.getScriptCode();
+
+        hb_script_t hb_script ;
+        if ( run_code == USCRIPT_INVALID_CODE)
+            hb_script = HB_SCRIPT_INVALID;
+        else
+            hb_script = hb_script_from_string(uscript_getShortName(run_code), -1);
+
+        runs.emplace_back(hb_script, run_start, run_end);
+    }
+
+    return true ;
+}
+
+
+void TextLayout::mergeRuns(const vector<LangScriptRun> &script_runs, const vector<DirectionRun> &dir_runs, vector<TextItem> &items)
+{
+    for (auto &dir_run : dir_runs)
+    {
+        uint start = std::get<1>(dir_run) ;
+        uint end = std::get<2>(dir_run);
+
+        auto rtl_insertion_point = items.end();
+
+        auto ms_it = script_runs.end() ;
+        for ( auto it = script_runs.begin(); it != script_runs.end(); ++it ) {
+            if (( std::get<1>(*it) <= start ) && ( std::get<2>(*it) > start) ) {
+                ms_it = it ;
+                break ;
+            }
+        }
+
+        while (start < end)
+        {
+            TextItem item;
+            item.start_ = start ;
+            item.end_ = std::min(std::get<2>(*ms_it), end);
+            item.script_ = std::get<0>(*ms_it) ;
+            item.lang_ = ScriptRun::detectLanguage(item.script_);
+            item.dir_ = std::get<0>(dir_run) ;
+
+            if ( item.dir_ == HB_DIRECTION_LTR )
+                items.emplace_back(item);
+            else
+                rtl_insertion_point = items.insert(rtl_insertion_point, item);
+
+            start = item.end_ ;
+
+            if ( std::get<2>(*ms_it) == start)
+                ++ms_it;
+        }
+    }
+}
+
+
+void TextLayout::breakLine(int32_t start, int32_t end) {
+    cout << start << ' ' << end << endl ;
+
+    TextLine line(start, end);
+
+    shape(line);
+   #if 0
+       double scaled_wrap_width = wrap_width_ * scale_factor_;
+       if (scaled_wrap_width <= 0 || line.width() < scaled_wrap_width)
+       {
+           add_line(std::move(line));
+           return;
+       }
+       if (text_ratio_ > 0)
+       {
+           double wrap_at;
+           double string_width = line.width();
+           double string_height = line.line_height();
+           for (double i = 1.0;
+                ((wrap_at = string_width/i)/(string_height*i)) > text_ratio_ && (string_width/i) > scaled_wrap_width;
+                i += 1.0) ;
+           scaled_wrap_width = wrap_at;
+       }
+
+       mapnik::value_unicode_string const& text = itemizer_.text();
+       Locale locale; // TODO: Is the default constructor correct?
+       UErrorCode status = U_ZERO_ERROR;
+       std::unique_ptr<BreakIterator> breakitr(BreakIterator::createLineInstance(locale, status));
+
+       // Not breaking the text if an error occurs is probably the best thing we can do.
+       // https://github.com/mapnik/mapnik/issues/2072
+       if (!U_SUCCESS(status))
+       {
+           add_line(std::move(line));
+           MAPNIK_LOG_ERROR(text_layout) << " could not create BreakIterator: " << u_errorName(status);
+           return;
+       }
+
+       breakitr->setText(text);
+       double current_line_length = 0;
+       int last_break_position = static_cast<int>(line.first_char());
+       for (unsigned i = line.first_char(); i < line.last_char(); ++i)
+       {
+           // TODO: character_spacing
+           std::map<unsigned, double>::const_iterator width_itr = width_map_.find(i);
+           if (width_itr != width_map_.end())
+           {
+               current_line_length += width_itr->second;
+           }
+           if (current_line_length <= scaled_wrap_width) continue;
+
+           int break_position = wrap_before_ ? breakitr->preceding(i + 1) : breakitr->following(i);
+           // following() returns a break position after the last word. So DONE should only be returned
+           // when calling preceding.
+           if (break_position <= last_break_position || break_position == static_cast<int>(BreakIterator::DONE))
+           {
+               // A single word is longer than the maximum line width.
+               // Violate line width requirement and choose next break position
+               break_position = breakitr->following(i);
+               if (break_position == static_cast<int>(BreakIterator::DONE))
+               {
+                   break_position = line.last_char();
+                   MAPNIK_LOG_ERROR(text_layout) << "Unexpected result in break_line. Trying to recover...\n";
+               }
+           }
+           // Break iterator operates on the whole string, while we only look at one line. So we need to
+           // clamp break values.
+           if (break_position < static_cast<int>(line.first_char()))
+           {
+               break_position = line.first_char();
+           }
+           if (break_position > static_cast<int>(line.last_char()))
+           {
+               break_position = line.last_char();
+           }
+           bool adjust_for_space_character = break_position > 0 && text[break_position - 1] == 0x0020;
+
+           text_line new_line(last_break_position, adjust_for_space_character ? break_position - 1 : break_position);
+           clear_cluster_widths(last_break_position, adjust_for_space_character ? break_position - 1 : break_position);
+           shape_text(new_line);
+           add_line(std::move(new_line));
+
+           last_break_position = break_position;
+           i = break_position - 1;
+           current_line_length = 0;
+       }
+
+       if (last_break_position == static_cast<int>(line.first_char()))
+       {
+           // No line breaks => no reshaping required
+           add_line(std::move(line));
+       }
+       else if (last_break_position != static_cast<int>(line.last_char()))
+       {
+           text_line new_line(last_break_position, line.last_char());
+           clear_cluster_widths(last_break_position, line.last_char());
+           shape_text(new_line);
+           add_line(std::move(new_line));
+   }
+#endif
+}
+
+bool TextLayout::shape(TextLine &line)
+{
+    unsigned start = line.first_ ;
+    unsigned end = line.last_ ;
+    std::size_t length = end - start;
+
+    if ( !length ) return true ;
+
+    // itemize text span
+    vector<TextItem> items ;
+    itemize(start, end, items);
+
+    // prepare HarfBuzz shaping engine
+
+    line.glyphs_.reserve(length);
+
+    auto hb_buffer_deleter = [](hb_buffer_t * buffer) { hb_buffer_destroy(buffer);};
+    const std::unique_ptr<hb_buffer_t, decltype(hb_buffer_deleter)> buffer(hb_buffer_create(), hb_buffer_deleter);
+
+    hb_buffer_pre_allocate(buffer.get(), length);
+
+    // perform shaping for each item, with unique script, direction
+
+    for ( const auto & text_item : items ) {
+
+        struct glyph_face_info
+        {
+            cairo_scaled_font_t *face;
+            hb_glyph_info_t glyph;
+            hb_glyph_position_t position;
+        };
+
+        for( const auto &face_name: font_.familyNames() ) {
+
+            // initialize buffer with subtext and corresponding direction and script
+
+            hb_buffer_clear_contents(buffer.get());
+            hb_buffer_add_utf16(buffer.get(), us_.getBuffer(), us_.length(), text_item.start_, static_cast<int>(text_item.end_ - text_item.start_));
+            hb_buffer_set_direction(buffer.get(), text_item.dir_);
+
+            if ( !text_item.lang_.empty() )
+                hb_buffer_set_language(buffer.get(), hb_language_from_string(text_item.lang_.c_str(), -1));
+
+            hb_buffer_set_script(buffer.get(), text_item.script_);
+
+         //   hb_ft_font_set_load_flags(font,FT_LOAD_DEFAULT | FT_LOAD_NO_HINTING);
+
+            // try to load font
+
+            cairo_scaled_font_t *sf = cairo_setup_font(face_name, font_.style(), font_.weight(), font_.size()) ;
+
+            FT_Face ft_face = cairo_ft_scaled_font_lock_face(sf) ;
+
+            if ( ft_face == 0 ) return false ;
+
+            hb_font_t *hb_font = hb_ft_font_create(ft_face, nullptr);
+
+            // run shaper on this segment and font
+
+            hb_shape(hb_font, buffer.get(), 0, 0);
+
+            hb_font_destroy(hb_font);
+
+            cairo_ft_scaled_font_unlock_face(sf) ;
+
+            // get resulting glyphs and find which of the characters were correctly mapped by the current font face
+
+            unsigned num_glyphs = hb_buffer_get_length(buffer.get());
+            hb_glyph_info_t *glyphs = hb_buffer_get_glyph_infos(buffer.get(), &num_glyphs);
+            hb_glyph_position_t *positions = hb_buffer_get_glyph_positions(buffer.get(), &num_glyphs);
+
+        }
+#if 0
+           face_set_ptr face_set = font_manager.get_face_set(text_item.format_->face_name, text_item.format_->fontset);
+           double size = text_item.format_->text_size * scale_factor;
+           face_set->set_unscaled_character_sizes();
+           std::size_t num_faces = face_set->size();
+
+           font_feature_settings const& ff_settings = text_item.format_->ff_settings;
+           int ff_count = safe_cast<int>(ff_settings.count());
+
+           // rendering information for a single glyph
+           struct glyph_face_info
+           {
+               face_ptr face;
+               hb_glyph_info_t glyph;
+               hb_glyph_position_t position;
+           };
+
+           // this table is filled with information for rendering each glyph, so that
+           // several font faces can be used in a single text_item
+           std::size_t pos = 0;
+           std::vector<std::vector<glyph_face_info>> glyphinfos;
+
+           glyphinfos.resize(text.length());
+           for (auto const& face : *face_set)
+           {
+               ++pos;
+               hb_buffer_clear_contents(buffer.get());
+               hb_buffer_add_utf16(buffer.get(), detail::uchar_to_utf16(text.getBuffer()), text.length(), text_item.start, static_cast<int>(text_item.end - text_item.start));
+               hb_buffer_set_direction(buffer.get(), (text_item.dir == UBIDI_RTL) ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
+
+               hb_font_t *font(hb_ft_font_create(face->get_face(), nullptr));
+               auto script = detail::_icu_script_to_script(text_item.script);
+               auto language = detail::script_to_language(script);
+               MAPNIK_LOG_DEBUG(harfbuzz_shaper) << "RUN:[" << text_item.start << "," << text_item.end << "]"
+                                                 << " LANGUAGE:" << hb_language_to_string(language)
+                                                 << " SCRIPT:" << script << "(" << text_item.script << ") " << uscript_getShortName(text_item.script)
+                                                 << " FONT:" << face->family_name();
+               if (language != HB_LANGUAGE_INVALID)
+               {
+                   hb_buffer_set_language(buffer.get(), language); // set most common language for the run based script
+               }
+               hb_buffer_set_script(buffer.get(), script);
+
+               // https://github.com/mapnik/test-data-visual/pull/25
+   #if HB_VERSION_MAJOR > 0
+   #if HB_VERSION_ATLEAST(1, 0 , 5)
+               hb_ft_font_set_load_flags(font,FT_LOAD_DEFAULT | FT_LOAD_NO_HINTING);
+   #endif
+   #endif
+               hb_shape(font, buffer.get(), ff_settings.get_features(), ff_count);
+               hb_font_destroy(font);
+
+               unsigned num_glyphs = hb_buffer_get_length(buffer.get());
+               hb_glyph_info_t *glyphs = hb_buffer_get_glyph_infos(buffer.get(), &num_glyphs);
+               hb_glyph_position_t *positions = hb_buffer_get_glyph_positions(buffer.get(), &num_glyphs);
+
+               unsigned cluster = 0;
+               bool in_cluster = false;
+               std::vector<unsigned> clusters;
+
+               for (unsigned i = 0; i < num_glyphs; ++i)
+               {
+                   if (i == 0)
+                   {
+                       cluster = glyphs[0].cluster;
+                       clusters.push_back(cluster);
+                   }
+                   if (cluster != glyphs[i].cluster)
+                   {
+                       cluster = glyphs[i].cluster;
+                       clusters.push_back(cluster);
+                       in_cluster = false;
+                   }
+                   else if (i != 0)
+                   {
+                       in_cluster = true;
+                   }
+                   if (glyphinfos.size() <= cluster)
+                   {
+                       glyphinfos.resize(cluster + 1);
+                   }
+                   auto & c = glyphinfos[cluster];
+                   if (c.empty())
+                   {
+                       c.push_back({face, glyphs[i], positions[i]});
+                   }
+                   else if (c.front().glyph.codepoint == 0)
+                   {
+                       c.front() = { face, glyphs[i], positions[i] };
+                   }
+                   else if (in_cluster)
+                   {
+                       c.push_back({ face, glyphs[i], positions[i] });
+                   }
+               }
+               bool all_set = true;
+               for (auto c_id : clusters)
+               {
+                   auto const& c = glyphinfos[c_id];
+                   if (c.empty() || c.front().glyph.codepoint == 0)
+                   {
+                       all_set = false;
+                       break;
+                   }
+               }
+               if (!all_set && (pos < num_faces))
+               {
+                   //Try next font in fontset
+                   continue;
+               }
+               double max_glyph_height = 0;
+               for (auto const& c_id : clusters)
+               {
+                   auto const& c = glyphinfos[c_id];
+                   for (auto const& info : c)
+                   {
+                       auto const& gpos = info.position;
+                       auto const& glyph = info.glyph;
+                       unsigned char_index = glyph.cluster;
+                       glyph_info g(glyph.codepoint,char_index,text_item.format_);
+                       if (info.glyph.codepoint != 0) g.face = info.face;
+                       else g.face = face;
+                       if (g.face->glyph_dimensions(g))
+                       {
+                           g.scale_multiplier = g.face->get_face()->units_per_EM > 0 ?
+                               (size / g.face->get_face()->units_per_EM) : (size / 2048.0) ;
+                           //Overwrite default advance with better value provided by HarfBuzz
+                           g.unscaled_advance = gpos.x_advance;
+                           g.offset.set(gpos.x_offset * g.scale_multiplier, gpos.y_offset * g.scale_multiplier);
+                           double tmp_height = g.height();
+                           if (g.face->is_color())
+                           {
+                               tmp_height = g.ymax();
+                           }
+                           if (tmp_height > max_glyph_height) max_glyph_height = tmp_height;
+                           width_map[char_index] += g.advance();
+                           line.add_glyph(std::move(g), scale_factor);
+                       }
+                   }
+               }
+               line.update_max_char_height(max_glyph_height);
+               break; //When we reach this point the current font had all glyphs.
+           }
+       }
+   #endif
+   }
+
+}
+
+bool TextLayout::itemize(int32_t start, int32_t end, vector<TextItem> &items) {
+    using namespace icu ;
+
+    // itemize directions
+    vector<DirectionRun> dir_runs ;
+    if ( !itemizeBiDi(dir_runs, start, end) ) return false ;
+
+    // itemize scripts
+    vector<LangScriptRun> script_runs ;
+    if ( !itemizeScript(script_runs) ) return false ;
+
+    mergeRuns(script_runs, dir_runs, items);
+
+    return true ;
+}
+
+
+TextLayout::TextLayout(const string &text, const Font &font): font_(font) {
+    us_ = UnicodeString::fromUTF8(text) ;
+}
+
+bool TextLayout::run() {
+    int32_t start = 0, end = 0;
+
+    while ( (end = us_.indexOf('\n', end) + 1) > 0 ) {
+        breakLine(start, end) ;
+        start = end;
+    }
+
+    breakLine(start, us_.length()) ;
+
+    return true ;
+}
+
 #endif
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/*
 void Backend::cairo_apply_font(const Font &font) {
-    cairo_font_face_t *font_face = query_font_face_fc(font.family(), font.style(), font.weight()) ;
+    cairo_font_face_t *font_face = CairoFontFaceCache::instance().query_font_face_fc(font.family(), font.style(), font.weight()) ;
 
     cairo_set_font_face(cr_, font_face) ;
     cairo_set_font_size(cr_, font.size()) ;
 }
-
+*/
 
 Backend::~Backend() {
-   cairo_surface_finish (surf_);
-   cairo_surface_destroy (surf_);
-   cairo_destroy(cr_) ;
+    cairo_surface_finish (surf_);
+    cairo_surface_destroy (surf_);
+    cairo_destroy(cr_) ;
 }
 
 
@@ -637,8 +1178,13 @@ void Canvas::clearPen() {
 
 void Canvas::drawText(const std::string &text, double x0, double y0, double width, double height, unsigned int flags)
 {
+
     const Font &f = state_.top().font_ ;
-    cairo_scaled_font_t *scaled_font = detail::cairo_setup_font(f.family(), f.style(), f.weight(), f.size()) ;
+
+    detail::TextLayout layout(text, f) ;
+    layout.run() ;
+
+    cairo_scaled_font_t *scaled_font = detail::cairo_setup_font(f.familyNames()[0], f.style(), f.weight(), f.size()) ;
 
     if ( !scaled_font ) return ;
 
@@ -697,7 +1243,7 @@ void Canvas::drawText(const std::string &text, double x0, double y0, double widt
 void Canvas::drawText(const string &str, double x0, double y0)
 {
     const Font &f = state_.top().font_ ;
-    cairo_scaled_font_t *scaled_font = detail::cairo_setup_font(f.family(), f.style(), f.weight(), f.size()) ;
+    cairo_scaled_font_t *scaled_font = detail::cairo_setup_font(f.familyNames()[0], f.style(), f.weight(), f.size()) ;
 
     if ( !scaled_font ) return ;
 

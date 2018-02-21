@@ -4,6 +4,7 @@ SET ( XG_FILES
      ${SRC_ROOT}/color.cpp
 
     ${SRC_ROOT}/backends/cairo/canvas.cpp
+    ${SRC_ROOT}/backends/cairo/scrptrun.cpp
     ${INCLUDE_ROOT}/backends/cairo/canvas.hpp
 
     ${INCLUDE_ROOT}/font.hpp
@@ -17,4 +18,5 @@ TARGET_LINK_LIBRARIES(xg
     ${Boost_LIBRARIES}
     ${CAIRO_LIBRARIES}
     ${HARFBUZZ_LIBRARIES}
+    ${ICU_LIBRARIES}
 )

@@ -6,12 +6,15 @@ namespace xg {
 
 struct NamedColor ;
 
+// RGBA color container
+// Components are always clamped in the range [0, 1]
+
 class Color
 {
 public:
     Color() = default ;
 
-    // parse CSS color spec
+    // parse CSS color spec string
     Color(const std::string &css_color_spec, double alpha = 1.0);
 
     Color(double r, double g, double b, double alpha = 1.0):
@@ -36,6 +39,7 @@ private:
     double r_= 0, g_=0, b_=0, a_=1.0 ;
 } ;
 
+// list of named colors
 
 struct NamedColor {
 public:

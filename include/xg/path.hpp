@@ -68,7 +68,6 @@ public:
 
     enum Command { MoveToCmd, ClosePathCmd, LineToCmd, CurveToCmd, QuadCurveToCmd } ;
 
-
     struct CommandBlock {
         CommandBlock(Command cmd, double arg0=0, double arg1=0, double arg2=0, double arg3=0, double arg4=0, double arg5=0):
             cmd_(cmd), arg0_(arg0), arg1_(arg1), arg2_(arg2), arg3_(arg3), arg4_(arg4), arg5_(arg5) {}

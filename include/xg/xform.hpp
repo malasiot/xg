@@ -5,7 +5,6 @@
 
 namespace xg {
 
-
 typedef Eigen::Affine2d Transform ;
 
 } // namespace xplot

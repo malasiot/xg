@@ -47,7 +47,6 @@ protected:
     void path(const Path &path) ;
     void polyline_path(double *pts, int n, bool) ;
     void set_object_bbox(double x0, double y0, double x1, double y1);
-    void cairo_apply_font(const Font &font);
 } ;
 
 
