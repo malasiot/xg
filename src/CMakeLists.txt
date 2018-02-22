@@ -4,6 +4,10 @@ SET ( XG_FILES
      ${SRC_ROOT}/color.cpp
 
     ${SRC_ROOT}/backends/cairo/canvas.cpp
+    ${SRC_ROOT}/backends/cairo/text_layout.cpp
+    ${SRC_ROOT}/backends/cairo/text_layout.hpp
+    ${SRC_ROOT}/backends/cairo/font_manager.cpp
+    ${SRC_ROOT}/backends/cairo/font_manager.hpp
     ${SRC_ROOT}/backends/cairo/scrptrun.cpp
     ${INCLUDE_ROOT}/backends/cairo/canvas.hpp
 
