@@ -483,7 +483,6 @@ void Canvas::drawText(const std::string &text, double x0, double y0, double widt
         for (unsigned i=0; i<num_glyphs; i++) {
             cairo_glyphs[i].index = glyphs[i].glyph_index_ ;
             cairo_glyphs[i].x = x + glyphs[i].x_offset_ ;
-            cairo_glyphs[i].y = y - glyphs[i].y_offset_ ;
 
             x +=  glyphs[i].advance_;
         }
@@ -493,14 +492,18 @@ void Canvas::drawText(const std::string &text, double x0, double y0, double widt
 
         cairo_translate(cr_, x0, y0) ;
 
-        cairo_show_glyphs(cr_, cairo_glyphs, num_glyphs) ;
-//        cairo_glyph_path(cr_, cairo_glyphs, num_glyphs);
+  //      cairo_show_glyphs(cr_, cairo_glyphs, num_glyphs) ;
+        cairo_glyph_path(cr_, cairo_glyphs, num_glyphs);
+
+        cairo_fill(cr_) ;
 
    //     fill_stroke_shape() ;
 
-        cairo_rectangle(cr_, 0, 0, width, height) ;
+        cairo_rectangle(cr_, 0, 0, layout.width(), -32) ;
 
         cairo_set_source_rgb(cr_, 1, 0, 0) ;
+
+        cairo_stroke(cr_) ;
 
         cairo_restore(cr_) ;
 

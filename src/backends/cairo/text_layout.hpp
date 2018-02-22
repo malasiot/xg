@@ -71,6 +71,8 @@ public:
 
     const std::vector<TextLine> &lines() const { return lines_ ; }
 
+    double width() const { return width_ ; }
+
 private:
 
 

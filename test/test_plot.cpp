@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
     canvas.drawRect(40, 100, 100, 100) ;
     canvas.drawLine(0, 90, 200, 90) ;
     canvas.setBrush(SolidBrush(NamedColor::alice_blue())) ;
-    string s("بسم الله الرحمن الرحيم") ;
+    string s("Win بسم الله الرحمن الرحيم") ;
     canvas.drawText(s, 40, 100, 100, 100, TextAlignTop | TextAlignHCenter) ;
     canvas.saveToPng("/tmp/oo.png") ;
 

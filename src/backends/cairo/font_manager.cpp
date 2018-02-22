@@ -105,13 +105,13 @@ cairo_scaled_font_t *FontManager::createFont(const Font &font)
             cairo_matrix_t ctm, font_matrix;
             cairo_font_options_t *font_options;
 
-            double font_size = font.size() ;
+            double font_size = font.size()  ;
 
             cairo_matrix_init_identity (&ctm);
             cairo_matrix_init_scale (&font_matrix, font_size, font_size);
             font_options = cairo_font_options_create ();
- //   cairo_font_options_set_hint_style (font_options, CAIRO_HINT_STYLE_NONE);
- //   cairo_font_options_set_hint_metrics (font_options, CAIRO_HINT_METRICS_OFF);
+           cairo_font_options_set_hint_style (font_options, CAIRO_HINT_STYLE_FULL);
+            cairo_font_options_set_hint_metrics (font_options, CAIRO_HINT_METRICS_OFF);
 
             cairo_scaled_font_t *scaled_font = cairo_scaled_font_create (face,
                                                                  &font_matrix,
