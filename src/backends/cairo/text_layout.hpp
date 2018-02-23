@@ -19,10 +19,8 @@ struct Glyph {
 
     Glyph(unsigned cp, unsigned c_index): glyph_index_(cp), char_index_(c_index) {}
 
-    double line_height_ ;
     unsigned glyph_index_;
     unsigned char_index_;
-    cairo_scaled_font_t *face_ ;
     double advance_;
     double x_offset_, y_offset_ ;
 };
@@ -30,12 +28,14 @@ struct Glyph {
 struct TextLine {
 
     TextLine(int32_t first, int32_t last): first_(first), last_(last) {}
+    ~TextLine() {
+    //    if ( glyphs_ ) cairo_glyph_free(glyphs_) ;
+    }
 
     void addGlyph(Glyph && glyph)  {
-        height_ = std::max(height_, glyph.line_height_) ;
         double advance = glyph.advance_ ;
 
-        if ( glyphs_.empty() )
+        if ( glyph_info_.empty() )
         {
             width_ = advance;
             glyphs_width_ = advance;
@@ -48,19 +48,23 @@ struct TextLine {
             glyphs_width_ += advance;
             ++space_count_;
         }
-        glyphs_.emplace_back(std::move(glyph));
+        glyph_info_.emplace_back(std::move(glyph));
     }
 
+    unsigned numGlyphs() const { return glyph_info_.size() ; }
 
-    double max_char_height_ = 0; // Max height of any glyphs in line - calculated by shaper
     double height_ = 0 ; // font height
     double width_; // line width
+    double ascent_, descent_ ;
     double glyphs_width_;
+
     int32_t first_;
     int32_t last_;
     bool first_line_ = false ;
     unsigned space_count_ = 0 ;
-    std::vector<Glyph> glyphs_ ;
+    std::vector<Glyph> glyph_info_ ;
+    cairo_glyph_t *glyphs_ = nullptr ;
+    double base_line_ = 0 ;
 } ;
 
 class TextLayout {
@@ -72,6 +76,7 @@ public:
     const std::vector<TextLine> &lines() const { return lines_ ; }
 
     double width() const { return width_ ; }
+    double height() const { return height_ ; }
 
 private:
 
@@ -83,10 +88,6 @@ private:
         std::string lang_ ;
         hb_direction_t dir_ ;
     } ;
-
-
-
-
 
 
     static hb_direction_t icu_direction_to_hb(UBiDiDirection direction) {
@@ -109,6 +110,7 @@ private:
     };
 
     struct GlyphCollection {
+        unsigned num_glyphs_ ;
         std::vector<std::vector<GlyphInfo>> glyphs_ ;
         std::vector<unsigned> clusters_ ;
     } ;
@@ -117,15 +119,24 @@ private:
     void fillGlyphInfo(GlyphCollection &glyphs, TextLine &line) ;
     void clearWidths(int32_t start, int32_t end) ;
     void addLine(TextLine&& line) ;
+    void makeCairoGlyphsAndMetrics(TextLine &line);
+    void computeHeight();
 
 private:
     UnicodeString us_ ;
     cairo_scaled_font_t *font_ ;
     std::map<unsigned,double> width_map_ ;
     double wrap_width_ ;
+
     std::vector<TextLine> lines_ ;
-    double width_, height_ ;
+    double width_ = 0, height_ = 0 ;
     unsigned glyphs_count_ ;
+    char wrap_char_ = ' ';
+    bool wrap_before_ = true ;
+    bool repeat_wrap_char_ = false;
+
+
+
 } ;
 
 #endif

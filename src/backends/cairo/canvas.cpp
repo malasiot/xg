@@ -468,29 +468,33 @@ void Canvas::drawText(const std::string &text, double x0, double y0, double widt
 
     cairo_set_scaled_font(cr_, scaled_font) ;
 
-    TextLayout layout(text, scaled_font) ;
+    TextLayout layout(text, scaled_font, width) ;
     layout.run() ;
+
+    double y = 0, tx = 0, ty = 0 ;
+
+    if ( flags & TextAlignVCenter )
+        ty = ( height - layout.height())/2;
+    else if ( flags & TextAlignBottom )
+        ty = height - layout.height()  ;
 
     for (const TextLine &line: layout.lines() ) {
 
-        const auto &glyphs = line.glyphs_ ;
+        if ( flags & TextAlignHCenter )
+            tx =  ( width - line.width_ )/2.0 ;
+        else if ( flags & TextAlignRight )
+            tx =  width - line.width_;
 
-        unsigned num_glyphs = glyphs.size() ;
+        if ( line.first_line_ )
+            y += line.ascent_ ;
 
-        double x = 0, y = 0 ;
-        cairo_glyph_t *cairo_glyphs = cairo_glyph_allocate (num_glyphs + 1);
+        unsigned num_glyphs = line.numGlyphs() ;
 
-        for (unsigned i=0; i<num_glyphs; i++) {
-            cairo_glyphs[i].index = glyphs[i].glyph_index_ ;
-            cairo_glyphs[i].x = x + glyphs[i].x_offset_ ;
-
-            x +=  glyphs[i].advance_;
-        }
-
+        cairo_glyph_t *cairo_glyphs = line.glyphs_ ;
 
         cairo_save(cr_) ;
 
-        cairo_translate(cr_, x0, y0) ;
+        cairo_translate(cr_, x0 + tx, y0 + y + ty) ;
 
   //      cairo_show_glyphs(cr_, cairo_glyphs, num_glyphs) ;
         cairo_glyph_path(cr_, cairo_glyphs, num_glyphs);
@@ -498,13 +502,17 @@ void Canvas::drawText(const std::string &text, double x0, double y0, double widt
         cairo_fill(cr_) ;
 
    //     fill_stroke_shape() ;
+#if 0
+        cairo_rectangle(cr_, 0, 0, layout.width(), -line.ascent_) ;
+        cairo_rectangle(cr_, 0, 0, layout.width(), line.descent_) ;
+#endif
 
-        cairo_rectangle(cr_, 0, 0, layout.width(), -32) ;
-
+        y += line.height_ ;
+#if 0
         cairo_set_source_rgb(cr_, 1, 0, 0) ;
 
         cairo_stroke(cr_) ;
-
+#endif
         cairo_restore(cr_) ;
 
     }

@@ -4,6 +4,8 @@
 #include <memory>
 #include <iostream>
 
+#include <xg/canvas.hpp>
+
 using namespace std ;
 using xg::Font ;
 
@@ -113,16 +115,43 @@ void TextLayout::mergeRuns(const vector<LangScriptRun> &script_runs, const vecto
 
 void TextLayout::addLine(TextLine&& line)
 {
-    if (lines_.empty())
+    if ( lines_.empty() ) {
         line.first_line_ = true;
+    }
 
-    height_ += line.height_ ;
-    glyphs_count_ += line.glyphs_.size();
     width_ = std::max(width_, line.width_);
+
     lines_.emplace_back(std::move(line));
+
 }
 
 
+struct LineBreaker
+{
+    LineBreaker(const UnicodeString& ustr, char wrap_char)
+        : ustr_(ustr),
+          wrap_char_(wrap_char) {}
+
+    int32_t following(int32_t offset) {
+        std::int32_t pos = ustr_.indexOf(wrap_char_, offset);
+        if (pos != -1) ++pos;
+        return pos;
+    }
+
+    std::int32_t preceding(std::int32_t offset) {
+        std::int32_t pos = ustr_.lastIndexOf(wrap_char_, 0, offset);
+        if (pos != -1) ++pos;
+        return pos;
+    }
+
+    const UnicodeString & ustr_;
+    char wrap_char_;
+};
+
+inline int adjust_last_break_position (int pos, bool repeat_wrap_char) {
+    if ( repeat_wrap_char )  return ( pos==0 ) ? 0: pos - 1;
+    else return pos;
+}
 
 void TextLayout::breakLine(int32_t start, int32_t end) {
     cout << start << ' ' << end << endl ;
@@ -133,108 +162,58 @@ void TextLayout::breakLine(int32_t start, int32_t end) {
 
     if ( wrap_width_ < 0 || line.width_ < wrap_width_ ) {
         addLine(std::move(line)) ;
+        return ;
     }
 
-   #if 0
-       double scaled_wrap_width = wrap_width_ * scale_factor_;
-       if (scaled_wrap_width <= 0 || line.width() < scaled_wrap_width)
-       {
-           add_line(std::move(line));
-           return;
-       }
-       if (text_ratio_ > 0)
-       {
-           double wrap_at;
-           double string_width = line.width();
-           double string_height = line.line_height();
-           for (double i = 1.0;
-                ((wrap_at = string_width/i)/(string_height*i)) > text_ratio_ && (string_width/i) > scaled_wrap_width;
-                i += 1.0) ;
-           scaled_wrap_width = wrap_at;
-       }
+    LineBreaker breaker(us_, wrap_char_);
 
-       mapnik::value_unicode_string const& text = itemizer_.text();
-       Locale locale; // TODO: Is the default constructor correct?
-       UErrorCode status = U_ZERO_ERROR;
-       std::unique_ptr<BreakIterator> breakitr(BreakIterator::createLineInstance(locale, status));
+    double current_line_length = 0;
+    int last_break_position = static_cast<int>(line.first_);
+    for ( unsigned i=line.first_; i < line.last_; ++i )
+    {
+        const auto width_itr = width_map_.find(i);
+        if ( width_itr != width_map_.end() )
+            current_line_length += width_itr->second;
+        if ( current_line_length <= wrap_width_ ) continue;
 
-       // Not breaking the text if an error occurs is probably the best thing we can do.
-       // https://github.com/mapnik/mapnik/issues/2072
-       if (!U_SUCCESS(status))
-       {
-           add_line(std::move(line));
-           MAPNIK_LOG_ERROR(text_layout) << " could not create BreakIterator: " << u_errorName(status);
-           return;
-       }
+        int break_position = wrap_before_ ? breaker.preceding(i) : breaker.following(i);
+        if ( break_position <= last_break_position || break_position == -1 ) {
+            break_position = breaker.following(i) ;
+            if ( break_position == -1 )
+                break_position = line.last_ ;
+        }
+        if ( break_position < line.first_ )
+            break_position = line.first_ ;
 
-       breakitr->setText(text);
-       double current_line_length = 0;
-       int last_break_position = static_cast<int>(line.first_char());
-       for (unsigned i = line.first_char(); i < line.last_char(); ++i)
-       {
-           // TODO: character_spacing
-           std::map<unsigned, double>::const_iterator width_itr = width_map_.find(i);
-           if (width_itr != width_map_.end())
-           {
-               current_line_length += width_itr->second;
-           }
-           if (current_line_length <= scaled_wrap_width) continue;
+        if ( break_position > line.last_ )
+            break_position = line.last_ ;
 
-           int break_position = wrap_before_ ? breakitr->preceding(i + 1) : breakitr->following(i);
-           // following() returns a break position after the last word. So DONE should only be returned
-           // when calling preceding.
-           if (break_position <= last_break_position || break_position == static_cast<int>(BreakIterator::DONE))
-           {
-               // A single word is longer than the maximum line width.
-               // Violate line width requirement and choose next break position
-               break_position = breakitr->following(i);
-               if (break_position == static_cast<int>(BreakIterator::DONE))
-               {
-                   break_position = line.last_char();
-                   MAPNIK_LOG_ERROR(text_layout) << "Unexpected result in break_line. Trying to recover...\n";
-               }
-           }
-           // Break iterator operates on the whole string, while we only look at one line. So we need to
-           // clamp break values.
-           if (break_position < static_cast<int>(line.first_char()))
-           {
-               break_position = line.first_char();
-           }
-           if (break_position > static_cast<int>(line.last_char()))
-           {
-               break_position = line.last_char();
-           }
-           bool adjust_for_space_character = break_position > 0 && text[break_position - 1] == 0x0020;
+        TextLine new_line(adjust_last_break_position(last_break_position, repeat_wrap_char_), break_position);
+        clearWidths(adjust_last_break_position(last_break_position, repeat_wrap_char_), break_position);
+        shape(new_line);
+        addLine(std::move(new_line));
+        last_break_position = break_position ;
+        i = break_position - 1;
+        current_line_length = 0;
+    }
+    if ( last_break_position == line.first_ )
+        addLine(std::move(line));
+    else if ( last_break_position != line.last_ ) {
+        TextLine new_line(adjust_last_break_position(last_break_position, repeat_wrap_char_), line.last_);
+        clearWidths(adjust_last_break_position(last_break_position, repeat_wrap_char_), line.last_);
+        shape(new_line);
+        addLine(std::move(new_line));
+    }
 
-           text_line new_line(last_break_position, adjust_for_space_character ? break_position - 1 : break_position);
-           clear_cluster_widths(last_break_position, adjust_for_space_character ? break_position - 1 : break_position);
-           shape_text(new_line);
-           add_line(std::move(new_line));
-
-           last_break_position = break_position;
-           i = break_position - 1;
-           current_line_length = 0;
-       }
-
-       if (last_break_position == static_cast<int>(line.first_char()))
-       {
-           // No line breaks => no reshaping required
-           add_line(std::move(line));
-       }
-       else if (last_break_position != static_cast<int>(line.last_char()))
-       {
-           text_line new_line(last_break_position, line.last_char());
-           clear_cluster_widths(last_break_position, line.last_char());
-           shape_text(new_line);
-           add_line(std::move(new_line));
-   }
-#endif
 }
+
 
 bool TextLayout::getGlyphsAndClusters(hb_buffer_t *buffer,  GlyphCollection &glyphs) {
 
     unsigned num_glyphs = hb_buffer_get_length(buffer);
     if ( num_glyphs == 0 ) return false ;
+
+    glyphs.num_glyphs_ = num_glyphs ;
 
     hb_glyph_info_t *hb_glyphs = hb_buffer_get_glyph_infos(buffer, &num_glyphs);
     hb_glyph_position_t *hb_positions = hb_buffer_get_glyph_positions(buffer, &num_glyphs);
@@ -255,7 +234,7 @@ bool TextLayout::getGlyphsAndClusters(hb_buffer_t *buffer,  GlyphCollection &gly
         else in_cluster = true ;
 
         if ( glyphs.glyphs_.size() <= cluster )
-               glyphs.glyphs_.resize(cluster + 1);
+            glyphs.glyphs_.resize(cluster + 1);
 
         auto &c = glyphs.glyphs_[cluster];
         if (c.empty())
@@ -282,6 +261,7 @@ bool TextLayout::getGlyphsAndClusters(hb_buffer_t *buffer,  GlyphCollection &gly
 
 }
 
+
 void TextLayout::clearWidths(int32_t start, int32_t end) {
     for ( int32_t i = start; i<end; ++i )
         width_map_[i] = 0 ;
@@ -289,10 +269,6 @@ void TextLayout::clearWidths(int32_t start, int32_t end) {
 
 void TextLayout::fillGlyphInfo(GlyphCollection &glyphs, TextLine &line)
 {
-    cairo_font_extents_t f_extents ;
-    cairo_scaled_font_extents (font_, &f_extents);
-
-    double max_glyph_height = 0;
 
     // iterate all clusters
 
@@ -310,25 +286,48 @@ void TextLayout::fillGlyphInfo(GlyphCollection &glyphs, TextLine &line)
             unsigned char_index = glyph.cluster;
             Glyph g(glyph.codepoint, char_index);
 
-            cairo_glyph_t c_glyph ;
-            c_glyph.index = info.glyph_.codepoint ;
-
-            cairo_text_extents_t extents ;
-            cairo_scaled_font_glyph_extents (font_, &c_glyph, 1, &extents) ;
-
             g.advance_ = gpos.x_advance/64.0 ;
             g.x_offset_ = gpos.x_offset/64.0;
             g.y_offset_ = gpos.y_offset/64.0 ;
-            g.line_height_ = f_extents.height ;
 
-            double height = extents.height ;
-            max_glyph_height = std::max(height, max_glyph_height) ;
             width_map_[char_index] += g.advance_  ;
 
             line.addGlyph(std::move(g)) ;
         }
     }
-    line.max_char_height_ = max_glyph_height ;
+}
+
+void TextLayout::makeCairoGlyphsAndMetrics(TextLine &line) {
+
+    cairo_font_extents_t f_extents ;
+    cairo_scaled_font_extents (font_, &f_extents);
+
+    line.height_ = f_extents.height ;
+
+    uint num_glyphs = line.glyph_info_.size() ;
+
+    double x = 0, y = 0 ;
+    cairo_glyph_t *cairo_glyphs = cairo_glyph_allocate (num_glyphs + 1);
+
+    unsigned i ;
+
+    for (i=0; i<num_glyphs; i++) {
+        cairo_glyphs[i].index = line.glyph_info_[i].glyph_index_ ;
+        cairo_glyphs[i].x = x + line.glyph_info_[i].x_offset_ ;
+        cairo_glyphs[i].y = y - line.glyph_info_[i].y_offset_ ;
+
+        x +=  line.glyph_info_[i].advance_;
+    }
+
+    cairo_text_extents_t extents ;
+    cairo_scaled_font_glyph_extents(font_, cairo_glyphs, num_glyphs, &extents);
+
+    double ascent = -extents.y_bearing ;
+    double descent = extents.height + extents.y_bearing ;
+
+    line.glyphs_ = cairo_glyphs ;
+    line.ascent_ = ascent ;
+    line.descent_ = descent ;
 }
 
 bool TextLayout::shape(TextLine &line)
@@ -345,7 +344,7 @@ bool TextLayout::shape(TextLine &line)
 
     // prepare HarfBuzz shaping engine
 
-    line.glyphs_.reserve(length);
+    line.glyph_info_.reserve(length);
 
     auto hb_buffer_deleter = [](hb_buffer_t * buffer) { hb_buffer_destroy(buffer);};
     const std::unique_ptr<hb_buffer_t, decltype(hb_buffer_deleter)> buffer(hb_buffer_create(), hb_buffer_deleter);
@@ -365,11 +364,11 @@ bool TextLayout::shape(TextLine &line)
         hb_buffer_set_direction(buffer.get(), text_item.dir_);
 
         if ( !text_item.lang_.empty() )
-             hb_buffer_set_language(buffer.get(), hb_language_from_string(text_item.lang_.c_str(), -1));
+            hb_buffer_set_language(buffer.get(), hb_language_from_string(text_item.lang_.c_str(), -1));
 
         hb_buffer_set_script(buffer.get(), text_item.script_);
 
-         //   hb_ft_font_set_load_flags(font,FT_LOAD_DEFAULT | FT_LOAD_NO_HINTING);
+        //   hb_ft_font_set_load_flags(font,FT_LOAD_DEFAULT | FT_LOAD_NO_HINTING);
 
         FT_Face ft_face = cairo_ft_scaled_font_lock_face(font_) ;
 
@@ -377,7 +376,7 @@ bool TextLayout::shape(TextLine &line)
 
         hb_font_t *hb_font = hb_ft_font_create(ft_face, nullptr);
 
-            // run shaper on this segment and font
+        // run shaper on this segment and font
 
         hb_shape(hb_font, buffer.get(), 0, 0);
 
@@ -390,7 +389,9 @@ bool TextLayout::shape(TextLine &line)
         getGlyphsAndClusters(buffer.get(), glyphs) ;
 
         fillGlyphInfo(glyphs, line);
-   }
+    }
+
+    makeCairoGlyphsAndMetrics(line) ;
 
 }
 
@@ -415,15 +416,36 @@ TextLayout::TextLayout(const string &text, cairo_scaled_font_t *font, double wid
     us_ = UnicodeString::fromUTF8(text) ;
 }
 
+
 bool TextLayout::run() {
     int32_t start = 0, end = 0;
 
-    while ( (end = us_.indexOf('\n', end) + 1) > 0 ) {
+    while ( (end = us_.indexOf('\n', start)) > 0 ) {
         breakLine(start, end) ;
-        start = end;
+        start = end+1;
     }
 
     breakLine(start, us_.length()) ;
 
+    computeHeight() ;
+
     return true ;
+}
+
+void TextLayout::computeHeight()
+{
+    height_ = 0 ;
+
+    if ( lines_.empty() ) return ;
+
+    height_ += lines_[0].ascent_ ;
+
+    uint i ;
+    for( i=0 ; i<lines_.size() - 1; i++ ) {
+        const TextLine &l = lines_[i] ;
+        height_ += l.height_ ;
+    }
+
+    height_ += lines_[i].descent_ ;
+
 }
