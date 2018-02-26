@@ -32,6 +32,18 @@ string FontManager::font_face_key(const string &family_name, FontStyle font_styl
     return key ;
 }
 
+// https://stackoverflow.com/a/4119881
+
+static bool iequals(const string& a, const string& b) {
+    unsigned int sz = a.size();
+    if (b.size() != sz) return false;
+
+    for (unsigned int i = 0; i < sz; ++i)
+        if (tolower(a[i]) != tolower(b[i]))
+            return false;
+    return true;
+}
+
 cairo_font_face_t *FontManager::queryFace(const std::string &family_name, FontStyle font_style, FontWeight font_weight)
 {
     string key = font_face_key(family_name, font_style, font_weight) ;
@@ -77,11 +89,17 @@ cairo_font_face_t *FontManager::queryFace(const std::string &family_name, FontSt
     if (!resultPattern) // No match.
         return 0;
 
-    FcChar8* fontConfigFamilyNameAfterMatching;
-    FcPatternGetString(resultPattern, FC_FAMILY, 0, &fontConfigFamilyNameAfterMatching);
+    FcChar8* fc_family_name_str;
+    FcPatternGetString(resultPattern, FC_FAMILY, 0, &fc_family_name_str);
+    string fc_family_name((char *)fc_family_name_str) ;
 
-
-    face = cairo_ft_font_face_create_for_pattern(resultPattern) ;
+    if (!iequals(family_name, fc_family_name)
+            && !(iequals(family_name, "sans") || iequals(family_name, "sans-serif")
+              || iequals(family_name, "serif") || iequals(family_name, "monospace")
+              || iequals(family_name, "fantasy") || iequals(family_name, "cursive")))
+        face = nullptr ;
+    else
+        face = cairo_ft_font_face_create_for_pattern(resultPattern) ;
 
     cairo_font_options_destroy(font_options) ;
 

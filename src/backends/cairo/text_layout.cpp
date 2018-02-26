@@ -4,6 +4,7 @@
 #include <memory>
 #include <iostream>
 
+#include <unicode/brkiter.h>
 #include <xg/canvas.hpp>
 
 using namespace std ;
@@ -125,36 +126,28 @@ void TextLayout::addLine(TextLine&& line)
 
 }
 
+class ICUBreakIterator {
+public:
 
-struct LineBreaker
-{
-    LineBreaker(const UnicodeString& ustr, char wrap_char)
-        : ustr_(ustr),
-          wrap_char_(wrap_char) {}
-
-    int32_t following(int32_t offset) {
-        std::int32_t pos = ustr_.indexOf(wrap_char_, offset);
-        if (pos != -1) ++pos;
-        return pos;
+    static ICUBreakIterator &instance() {
+        static ICUBreakIterator instance_ ;
+        return instance_ ;
     }
 
-    std::int32_t preceding(std::int32_t offset) {
-        std::int32_t pos = ustr_.lastIndexOf(wrap_char_, 0, offset);
-        if (pos != -1) ++pos;
-        return pos;
+    ICUBreakIterator() {
+        UErrorCode status = U_ZERO_ERROR;
+        breakitr_.reset(BreakIterator::createLineInstance(Locale::getUS(), status));
     }
 
-    const UnicodeString & ustr_;
-    char wrap_char_;
-};
+    std::unique_ptr<BreakIterator> breakitr_ ;
 
-inline int adjust_last_break_position (int pos, bool repeat_wrap_char) {
-    if ( repeat_wrap_char )  return ( pos==0 ) ? 0: pos - 1;
-    else return pos;
-}
+    BreakIterator *iterator() {
+        return breakitr_.get() ;
+    }
+
+} ;
 
 void TextLayout::breakLine(int32_t start, int32_t end) {
-    cout << start << ' ' << end << endl ;
 
     TextLine line(start, end);
 
@@ -165,7 +158,15 @@ void TextLayout::breakLine(int32_t start, int32_t end) {
         return ;
     }
 
-    LineBreaker breaker(us_, wrap_char_);
+    BreakIterator *breakitr = ICUBreakIterator::instance().iterator() ;
+
+    if ( !breakitr ) {
+        addLine(std::move(line));
+        return;
+    }
+
+    breakitr->setText(us_) ;
+
 
     double current_line_length = 0;
     int last_break_position = static_cast<int>(line.first_);
@@ -176,10 +177,11 @@ void TextLayout::breakLine(int32_t start, int32_t end) {
             current_line_length += width_itr->second;
         if ( current_line_length <= wrap_width_ ) continue;
 
-        int break_position = wrap_before_ ? breaker.preceding(i) : breaker.following(i);
-        if ( break_position <= last_break_position || break_position == -1 ) {
-            break_position = breaker.following(i) ;
-            if ( break_position == -1 )
+        int break_position = wrap_before_ ? breakitr->preceding(i + 1) : breakitr->following(i);
+
+        if ( break_position <= last_break_position || break_position == static_cast<int>(BreakIterator::DONE) ) {
+            break_position = breakitr->following(i) ;
+            if ( break_position == static_cast<int>(BreakIterator::DONE) )
                 break_position = line.last_ ;
         }
         if ( break_position < line.first_ )
@@ -188,8 +190,10 @@ void TextLayout::breakLine(int32_t start, int32_t end) {
         if ( break_position > line.last_ )
             break_position = line.last_ ;
 
-        TextLine new_line(adjust_last_break_position(last_break_position, repeat_wrap_char_), break_position);
-        clearWidths(adjust_last_break_position(last_break_position, repeat_wrap_char_), break_position);
+        bool adjust_for_space_character = break_position > 0 && us_[break_position - 1] == 0x0020;
+
+        TextLine new_line(last_break_position, adjust_for_space_character ? break_position - 1 : break_position);
+        clearWidths(last_break_position, adjust_for_space_character ? break_position - 1 : break_position);
         shape(new_line);
         addLine(std::move(new_line));
         last_break_position = break_position ;
@@ -199,14 +203,13 @@ void TextLayout::breakLine(int32_t start, int32_t end) {
     if ( last_break_position == line.first_ )
         addLine(std::move(line));
     else if ( last_break_position != line.last_ ) {
-        TextLine new_line(adjust_last_break_position(last_break_position, repeat_wrap_char_), line.last_);
-        clearWidths(adjust_last_break_position(last_break_position, repeat_wrap_char_), line.last_);
+        TextLine new_line(last_break_position, line.last_);
+        clearWidths(last_break_position, line.last_);
         shape(new_line);
         addLine(std::move(new_line));
     }
 
 }
-
 
 bool TextLayout::getGlyphsAndClusters(hb_buffer_t *buffer,  GlyphCollection &glyphs) {
 
