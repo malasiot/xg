@@ -1,15 +1,19 @@
 #include <xg/canvas.hpp>
+#include <xg/image.hpp>
 
 using namespace xg ;
 using namespace std ;
 
 int main(int argc, char *argv[]) {
 
+    Image im(256, 256) ;
+    string buffer ;
+    im.saveToPNGBuffer(buffer) ;
     ImageCanvas canvas(1024, 512) ;
 
     canvas.setPen(Pen()) ;
 
-    Font f("Amiris,serif", 12) ;
+    Font f("Amiri,serif", 12) ;
     f.setStyle(FontStyle::Italic) ;
     canvas.setFont(f) ;
     canvas.drawRect(40, 100, 100, 100) ;
@@ -23,6 +27,6 @@ int main(int argc, char *argv[]) {
     canvas.drawRect(40, 100, w, 400) ;
     canvas.drawText(s, 40, 100, w, 400, TextAlignTop | TextAlignRight) ;
 
-    canvas.saveToPng("/tmp/oo.png") ;
+    canvas.getImage().saveToPNG("/tmp/oo.png") ;
 
 }

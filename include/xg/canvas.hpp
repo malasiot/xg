@@ -10,6 +10,7 @@
 #include <xg/xform.hpp>
 #include <xg/path.hpp>
 #include <xg/font.hpp>
+#include <xg/image.hpp>
 
 #include <xg/backends/cairo/canvas.hpp>
 
@@ -59,6 +60,8 @@ public:
     void drawText(const std::string &textStr, double x0, double y0) ;
     void drawText(const std::string &textStr, double x0, double y0, double width, double height, unsigned int flags) ;
 
+    void drawImage(const Image &im, double x0, double y0, double width, double height, double opacity) ;
+
 protected:
     double width_, height_ ;
 } ;
@@ -68,6 +71,8 @@ class ImageCanvas: public Canvas
 public:
 
     ImageCanvas(double width, double height, double dpi=300) ;
+
+    Image getImage() ;
 
     void saveToPng(const std::string &fname) ;
 

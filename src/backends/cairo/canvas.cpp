@@ -389,8 +389,83 @@ static bool shape_text(const std::string &text, cairo_scaled_font_t *sf, cairo_g
     hb_buffer_destroy(buffer) ;
 }
 
+cairo_surface_t *cairo_create_image_surface(const Image &im)
+{
+    cairo_surface_t *psurf ;
 
-//
+    int width = im.width(), height = im.height() ;
+
+    int src_stride = im.stride() ;
+
+    psurf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height) ;
+
+    // this is needed to work with transparency
+    cairo_t *cr2 = cairo_create (psurf);
+    cairo_set_operator (cr2, CAIRO_OPERATOR_SOURCE);
+    cairo_set_source_rgba (cr2, 0, 0, 0, 1);
+    cairo_paint (cr2);
+    cairo_destroy (cr2);
+
+    unsigned char *dst = cairo_image_surface_get_data(psurf) ;
+    int dst_stride = cairo_image_surface_get_stride(psurf);
+
+    unsigned char *dp, *drp = dst ;
+    unsigned char *sp, *srp = (unsigned char *)im.pixels() ;
+
+    if ( im.format() == ImageFormat::RGB24  )
+    {
+        for (int i = 0; i < height; i++)
+        {
+            dp = drp; sp = srp ;
+
+            for (int j = 0; j < width; j++)
+            {
+                unsigned char red =   sp[0]  ;
+                unsigned char green = sp[1]  ;
+                unsigned char blue =  sp[2]  ;
+                unsigned char alpha = 255 ;
+                unsigned int p = (alpha << 24) | (red << 16) | (green << 8) | (blue << 0);
+                *((int32_t *)dp) = p ;
+
+                dp += 4 ;
+                sp += 3 ;
+            }
+
+            drp += dst_stride ;
+            srp += src_stride ;
+        }
+    }
+    else if ( im.format() == ImageFormat::ARGB32 )
+    {
+        for (int i = 0; i < height; i++)
+        {
+            dp = drp; sp = srp ;
+
+            for (int j = 0; j < width; j++)
+            {
+                unsigned char alpha = sp[0] ;
+                unsigned char red =   sp[1] ;
+                unsigned char green = sp[2] ;
+                unsigned char blue =  sp[3] ;
+
+                unsigned int p = (alpha << 24) | (red << 16) | (green << 8) | (blue << 0);
+
+                *((uint32_t *)dp) = p ;
+
+                dp += 4 ;
+                sp += 4 ;
+            }
+
+            drp += dst_stride ;
+            srp += src_stride ;
+        }
+    }
+
+
+    return psurf ;
+}
+
+
 
 
 
@@ -734,132 +809,41 @@ ImageCanvas::ImageCanvas(double w, double h, double dpi): Canvas(w, h), dpi_(dpi
     cr_ = cairo_create(surf_) ;
 }
 
-void ImageCanvas::saveToPng(const std::string &fileName) {
-    cairo_surface_write_to_png ((cairo_surface_t *)surf_, fileName.c_str());
-}
-/*
 
-cairo_surface_t *cairo_create_image_surface(const cv::Mat &im)
+Image ImageCanvas::getImage()
 {
-    cairo_surface_t *psurf ;
+    char *src = (char *)cairo_image_surface_get_data(surf_) ;
+    unsigned width = cairo_image_surface_get_width(surf_) ;
+    unsigned height = cairo_image_surface_get_height(surf_) ;
+    unsigned src_stride = cairo_image_surface_get_stride(surf_) ;
 
-    int width = im.cols, height = im.rows ;
+    Image im(width, height, ImageFormat::ARGB32) ;
 
-    int sstride = im.step[0] ;
+    unsigned dst_stride = im.stride() ;
+    char *dst, *p, *q ;
+    dst = im.pixels() ;
+    uint i, j ;
 
-    psurf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height) ;
-
-    // this is needed to work with transparency
-    cairo_t *cr2 = cairo_create (psurf);
-    cairo_set_operator (cr2, CAIRO_OPERATOR_SOURCE);
-    cairo_set_source_rgba (cr2, 0, 0, 0, 1);
-    cairo_paint (cr2);
-    cairo_destroy (cr2);
-
-    unsigned char *data = cairo_image_surface_get_data(psurf) ;
-    int dstride = cairo_image_surface_get_stride(psurf);
-
-    unsigned char *dp, *drp = data ;
-    unsigned char *sp, *srp = (unsigned char *)im.data ;
-
-    if ( im.type() == CV_8UC1  )
-    {
-        for (int i = 0; i < height; i++)
-        {
-            dp = drp; sp = srp ;
-
-            for (int j = 0; j < width; j++)
-            {
-                unsigned char val = *sp ;
-                unsigned char red =   val  ;
-                unsigned char green = val  ;
-                unsigned char blue =  val  ;
-                unsigned char alpha = 255 ;
-                unsigned int p = (alpha << 24) | (red << 16) | (green << 8) | (blue << 0);
-                *((int32_t *)dp) = p ;
-
-                dp += 4 ;
-                sp ++ ;
-
-            }
-
-            drp += dstride ;
-            srp += sstride ;
+    for( i=0 ; i<height ; i++, dst += dst_stride, src += src_stride ) {
+        for( j=0, p=src, q=dst ; j<width ; j++ ) {
+            char a = *p++, r = *p++, g = *p++, b = *p++ ;
+            *q++ = a ; *q++ = r ; *q++ = g ; *q++ = b ;
         }
-
-
-    }
-    else if ( im.type() == CV_8UC3 )
-    {
-        for (int i = 0; i < height; i++)
-        {
-            dp = drp; sp = srp ;
-
-            for (int j = 0; j < width; j++)
-            {
-                unsigned char red =   sp[2]  ;
-                unsigned char green = sp[1]  ;
-                unsigned char blue =  sp[0]  ;
-                unsigned char alpha = 255 ;
-                unsigned int p = (alpha << 24) | (red << 16) | (green << 8) | (blue << 0);
-                *((int32_t *)dp) = p ;
-
-                dp += 4 ;
-                sp += 3 ;
-            }
-
-            drp += dstride ;
-            srp += sstride ;
-        }
-
-
-
-    }
-    else if ( im.type() == CV_8UC4 )
-    {
-        for (int i = 0; i < height; i++)
-        {
-            dp = drp; sp = srp ;
-
-            for (int j = 0; j < width; j++)
-            {
-                unsigned char alpha = sp[3] ;
-                unsigned char red =   ( sp[2] * alpha ) >> 8 ;
-                unsigned char green = ( sp[1] * alpha ) >> 8 ;
-                unsigned char blue =  ( sp[0] * alpha ) >> 8 ;
-
-                unsigned int p = (alpha << 24) | (red << 16) | (green << 8) | (blue << 0);
-
-                *((uint32_t *)dp) = p ;
-
-                dp += 4 ;
-                sp += 4 ;
-            }
-
-            drp += dstride ;
-            srp += sstride ;
-        }
-
-
-
     }
 
+    return im ;
 
-    return psurf ;
 }
 
 
-Backend & Backend::drawImage(const cv::Mat &im, double x0, double y0, double w, double h, ViewBoxPolicy policy, ViewBoxAlign align,
+void Canvas::drawImage(const Image &im, double x0, double y0, double w, double h,
                         double opacity )
 {
-    cairo_t *cr = (cairo_t *)cr_  ;
+    cairo_surface_t *imsurf = detail::cairo_create_image_surface(im) ;
 
-    //cairo_surface_t *imsurf = cairo_image_surface_create_from_png("D:/Temp/oo.png") ;
-    cairo_surface_t *imsurf = cairo_create_image_surface(im) ;
-
-    int width = cairo_image_surface_get_width(imsurf) ;
-    int height = cairo_image_surface_get_height(imsurf) ;
-
+    unsigned width = im.width() ;
+    unsigned height = im.height() ;
+/*
     Transform trs = getViewBoxTransform(w, h, width, height, 0, 0, policy, align ) ;
 
     cairo_save(cr) ;
@@ -873,13 +857,14 @@ Backend & Backend::drawImage(const cv::Mat &im, double x0, double y0, double w, 
 
     cairo_paint_with_alpha (cr, opacity);
     cairo_restore(cr) ;
-
+*/
     cairo_surface_destroy(imsurf) ;
 
-    return *this ;
+
 
 }
 
+/*
 Backend &Backend::drawImage(const std::string &pngImageFile, double x0, double y0, double w, double h, ViewBoxPolicy policy, ViewBoxAlign align,
                         double opacity )
 {
