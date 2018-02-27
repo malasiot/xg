@@ -25,6 +25,7 @@ int main(int argc, char *argv[]) {
 
     Matrix2d tr ;
     tr.translate(Vector2d(-40, -100)) ;
+    tr.scale(0.5, 0.5) ;
     tr.rotate(30 * M_PI/180) ;
     tr.translate(Vector2d(40, 100)) ;
 

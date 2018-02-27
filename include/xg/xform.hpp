@@ -66,7 +66,7 @@ public:
 
     Matrix2d &scale(double sx, double sy) {
         m1_ *= sx; m2_ *= sy; m3_ *= sx;
-        m4_ *= sy;
+        m4_ *= sy; m5_ *= sx; m6_ *= sy;
         return *this ;
     }
 
