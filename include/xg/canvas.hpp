@@ -11,6 +11,7 @@
 #include <xg/path.hpp>
 #include <xg/font.hpp>
 #include <xg/image.hpp>
+#include <xg/rectangle.hpp>
 
 #include <xg/backends/cairo/canvas.hpp>
 
@@ -49,12 +50,16 @@ public:
     void setClipPath(const Path &p) ;
 
     void drawLine(double x0, double y0, double x1, double y1) ;
+    void drawLine(const Point2d &p1, const Point2d &p2) ;
     void drawRect(double x0, double y0, double w, double h) ;
+    void drawRect(const Rectangle2d &r) ;
+
     void drawPath(const Path &path) ;
 
     void drawPolyline(double *pts, int nPts) ;
     void drawPolygon(double *pts, int nPts) ;
     void drawCircle(double cx, double cy, double r) ;
+    void drawCircle(const Point2d &center, double r) ;
     void drawEllipse(double xp, double yp, double ax, double ay) ;
 
     void drawText(const std::string &textStr, double x0, double y0) ;

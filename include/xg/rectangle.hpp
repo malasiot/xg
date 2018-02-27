@@ -25,6 +25,9 @@ public:
 
     Point2d topLeft() const { return { x_, y_ } ; }
     Point2d bottomRight() const { return { x_ + width_, y_ + height_ } ; }
+    Point2d bottomLeft() const { return { x_, y_ + height_ } ; }
+    Point2d topRight() const { return { x_ + width_, y_ } ; }
+    Point2d center() const { return { x_ + width_/2, y_ + height_/2} ; }
 
     double width() const { return width_ ; }
     double height() const { return height_ ; }
@@ -36,6 +39,8 @@ public:
     double &x() { return x_ ; }
     double &y() { return y_ ; }
 
+
+
 private:
 
     void normalize() {
@@ -45,7 +50,7 @@ private:
         double bry = std::max(y_, y_ + height_) ;
 
         x_ = tlx ; y_ = tly ;
-        width_ = brx - tlx ; heigh_ = bry - tly ;
+        width_ = brx - tlx ; height_ = bry - tly ;
     }
 
 };

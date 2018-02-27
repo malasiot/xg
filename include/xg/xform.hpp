@@ -36,12 +36,31 @@ public:
         return { c, s, -s, c, 0.0, 0.0 } ;
     }
 
+    static Matrix2d rotation(double radians, const Point2d &center, double scale = 1.0 ) {
+        Matrix2d r ;
+        r.rotate(radians, center, scale) ;
+        return r ;
+    }
+
     static Matrix2d scaling(double sx, double sy) {
         return { sx, 0, 0, sy, 0.0, 0.0 } ;
     }
 
+    Matrix2d& translate(double tx, double ty) {
+        m5_ += tx ; m6_ += ty ;
+        return *this ;
+    }
+
     Matrix2d& translate(const Vector2d& value) {
-        m5_ += value.x() ; m6_ += value.y() ;
+        return translate(value.x(), value.y()) ;
+    }
+
+    Matrix2d &rotate(double angle, const Vector2d &center, double sf = 1.0) {
+        translate(-center) ;
+        scale(sf, sf) ;
+        rotate(angle) ;
+        translate(center) ;
+
         return *this ;
     }
 

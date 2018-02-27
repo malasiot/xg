@@ -228,7 +228,6 @@ void Backend::cairo_apply_pattern(const PatternBrush &pat)
 */
 
 void Backend::fill_stroke_shape() {
-    cairo_t *cr = (cairo_t *)cr_  ;
 
     const State &state = state_.top();
 
@@ -237,14 +236,14 @@ void Backend::fill_stroke_shape() {
 
         set_cairo_fill(br) ;
 
-        if ( state.pen_  ) cairo_fill_preserve(cr) ;
-        else cairo_fill (cr);
+        if ( state.pen_  ) cairo_fill_preserve(cr_) ;
+        else cairo_fill (cr_);
     }
 
     if ( state.pen_ )  {
         const Pen &pen = *state.pen_ ;
         set_cairo_stroke(pen) ;
-        cairo_stroke(cr) ;
+        cairo_stroke(cr_) ;
     }
 
 }
@@ -330,10 +329,6 @@ void Backend::rect_path(double x0, double y0, double w, double h) {
     cairo_rectangle(cr_, x0, y0, w, h);
     set_object_bbox(x0, y0, x0+w, y0+h) ;
 }
-
-
-
-
 
 
 const hb_tag_t KernTag = HB_TAG('k', 'e', 'r', 'n'); // kerning operations
@@ -714,9 +709,18 @@ void Canvas::drawLine(double x0, double y0, double x1, double y1) {
     fill_stroke_shape() ;
 }
 
+void Canvas::drawLine(const Point2d &p1, const Point2d &p2)
+{
+    drawLine(p1.x(), p1.y(), p2.x(), p2.y()) ;
+}
+
 void Canvas::drawRect(double x0, double y0, double w, double h) {
     rect_path(x0, y0, w, h) ;
     fill_stroke_shape() ;
+}
+
+void Canvas::drawRect(const Rectangle2d &r) {
+    drawRect(r.x(), r.y(), r.width(), r.height()) ;
 }
 
 void Canvas::drawPolyline(double *pts, int nPts) {
@@ -739,6 +743,10 @@ void Canvas::drawCircle(double cx, double cy, double r)
 {
     cairo_arc (cr_, cx, cy, r, 0.0, 2*M_PI) ;
     fill_stroke_shape() ;
+}
+
+void Canvas::drawCircle(const Point2d &center, double r) {
+    drawCircle(center.x(), center.y(), r) ;
 }
 
 #define SVG_ARC_MAGIC ((double) 0.5522847498)
