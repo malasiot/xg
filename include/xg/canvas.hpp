@@ -31,7 +31,7 @@ public:
     void save() ;
     void restore() ;
 
-    void setTransform(const Transform &tr) ;
+    void setTransform(const Matrix2d &tr) ;
 
     void setPen(const Pen &pen) ;
     void setBrush(const SolidBrush &brush) ;

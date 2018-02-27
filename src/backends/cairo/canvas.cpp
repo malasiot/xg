@@ -90,8 +90,8 @@ void Backend::cairo_apply_linear_gradient(const LinearGradientBrush &lg) {
 
     pattern = cairo_pattern_create_linear ( x0, y0, x1, y1 ) ;
 
-    Eigen::Matrix3d tr = lg.transform().matrix() ;
-    cairo_matrix_init (&matrix, tr(0, 0), tr(0, 1), tr(0, 2), tr(1, 0), tr(1, 1), tr(1, 2));
+    Matrix2d tr = lg.transform() ;
+    cairo_matrix_init (&matrix, tr.m1(), tr.m2(), tr.m3(), tr.m4(), tr.m5(), tr.m6());
 
     if ( lg.units() == ObjectBoundingBox ) {
         cairo_matrix_t bboxmatrix;
@@ -127,8 +127,8 @@ void Backend::cairo_apply_radial_gradient(const RadialGradientBrush &rg) {
 
     pattern = cairo_pattern_create_radial ( fx,	fy, 0.0, cx, cy, r) ;
 
-    Eigen::Matrix3d tr = rg.transform().matrix() ;
-    cairo_matrix_init (&matrix, tr(0, 0), tr(0, 1), tr(0, 2), tr(1, 0), tr(1, 1), tr(1, 2));
+    Matrix2d tr = rg.transform() ;
+    cairo_matrix_init (&matrix, tr.m1(), tr.m2(), tr.m3(), tr.m4(), tr.m5(), tr.m6());
 
     if ( rg.units() == ObjectBoundingBox )
     {
@@ -690,11 +690,10 @@ void Canvas::drawText(const string &str, double x0, double y0)
 }
 
 
-static void cairo_push_transform(cairo_t *cr, const Transform &a)
+static void cairo_push_transform(cairo_t *cr, const Matrix2d &a)
 {
     cairo_matrix_t matrix;
-    Eigen::Matrix3d tr = a.matrix() ;
-    cairo_matrix_init (&matrix, tr(0, 0), tr(0, 1), tr(0, 2), tr(1, 0), tr(1, 1), tr(1, 2));
+    cairo_matrix_init (&matrix, a.m1(), a.m2(), a.m3(), a.m4(), a.m5(), a.m6());
     cairo_transform (cr, &matrix);
 }
 
@@ -933,7 +932,7 @@ cv::Mat ImageSurface::getImage(bool transparency) const {
     return res ;
 }
 */
-void Canvas::setTransform(const Transform &tr) {
+void Canvas::setTransform(const Matrix2d &tr) {
     cairo_push_transform(cr_, tr) ;
 }
 

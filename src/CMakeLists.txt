@@ -16,6 +16,9 @@ SET ( XG_FILES
     ${INCLUDE_ROOT}/path.hpp
     ${INCLUDE_ROOT}/canvas.hpp
     ${INCLUDE_ROOT}/image.hpp
+    ${INCLUDE_ROOT}/vector.hpp
+    ${INCLUDE_ROOT}/rectangle.hpp
+    ${INCLUDE_ROOT}/xform.hpp
 )
 
 add_library(xg SHARED ${XG_FILES})

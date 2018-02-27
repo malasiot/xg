@@ -1,5 +1,6 @@
 #include <xg/canvas.hpp>
 #include <xg/image.hpp>
+#include <xg/vector.hpp>
 
 using namespace xg ;
 using namespace std ;
@@ -21,6 +22,13 @@ int main(int argc, char *argv[]) {
     canvas.setBrush(SolidBrush(NamedColor::alice_blue())) ;
     string s("Win is the mother of battles بسم الله الرحمن الرحيم") ;
    // string s("Win is \nthe mother of battles") ;
+
+    Matrix2d tr ;
+    tr.translate(Vector2d(-40, -100)) ;
+    tr.rotate(30 * M_PI/180) ;
+    tr.translate(Vector2d(40, 100)) ;
+
+    canvas.setTransform(tr);
 
     double w = 100 ;
     //string s("Σπανακόρυζο λεμονάτο και σπυρωτό. Μια παραδοσιακή κλασική συνταγή. Εύκολο, γρήγορο, οικονομικό, υγιεινό και νηστίσιμο!") ;

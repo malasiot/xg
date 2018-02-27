@@ -57,7 +57,7 @@ class GradientBrush: public Brush {
 public:
 
     void setSpread(SpreadMethod method) { sm_ = method ; }
-    void setTransform(const Transform &trans) { tr_ = trans ; }
+    void setMatrix2d(const Matrix2d &trans) { tr_ = trans ; }
     void setUnits(BrushUnits un) { gu_ = un ; }
 
 
@@ -75,7 +75,7 @@ public:
 
     BrushUnits units() const { return gu_ ; }
     SpreadMethod spread() const { return sm_ ; }
-    const Transform &transform() const { return tr_ ; }
+    const Matrix2d &transform() const { return tr_ ; }
     const std::vector<Stop> &stops() const { return stops_ ; }
 
 protected:
@@ -86,7 +86,7 @@ private:
 
     std::vector<Stop> stops_ ;
     SpreadMethod sm_ ;
-    Transform tr_ ;
+    Matrix2d tr_ ;
     BrushUnits gu_ ;
 
 } ;
@@ -140,12 +140,12 @@ public:
     PatternBrush(PatternSurface &surf, Units units = UserSpaceOnUse):
         pu_(units), surf_(surf)  {}
 
-    void setTransform(const Transform &trans) { tr_ = trans ; }
+    void setMatrix2d(const Matrix2d &trans) { tr_ = trans ; }
 
 private:
 
     PatternSurface &surf_ ;
-    Transform tr_ ;
+    Matrix2d tr_ ;
     Units pu_ ;
     double width_, height_ ;
 

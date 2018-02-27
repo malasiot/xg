@@ -28,7 +28,7 @@ public:
          std::shared_ptr<Pen> pen_ ;
          std::shared_ptr<Brush> brush_ ;
          Font font_ ;
-         Transform trans_ ;
+         Matrix2d trans_ ;
      };
 
     std::stack<State> state_ ;
