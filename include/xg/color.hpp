@@ -2,9 +2,12 @@
 #define __XPLOT_COLOR_HPP__
 
 #include <string>
+#include <stdexcept>
+
 namespace xg {
 
 struct NamedColor ;
+struct CSSColor ;
 
 // RGBA color container
 // Components are always clamped in the range [0, 1]
@@ -14,13 +17,10 @@ class Color
 public:
     Color() = default ;
 
-    // parse CSS color spec string
-    Color(const std::string &css_color_spec, double alpha = 1.0);
-
     Color(double r, double g, double b, double alpha = 1.0):
         r_(clamp(r)), g_(clamp(g)), b_(clamp(b)), a_(clamp(alpha)) {}
 
-    Color(const NamedColor &clr, double alpha = 1.0) ;
+    Color(const CSSColor &clr, double alpha = 1.0) ;
 
     double r() const noexcept { return r_ ; }
     double g() const noexcept { return g_ ; }
@@ -39,10 +39,29 @@ private:
     double r_= 0, g_=0, b_=0, a_=1.0 ;
 } ;
 
+struct CSSColor {
+public:
+
+    // parse css color, throws ColorParseException
+    CSSColor(const std::string &css_color_spec) ;
+
+    CSSColor(unsigned char r, unsigned char g, unsigned char b):
+        r_(r), g_(g), b_(b) {}
+
+    unsigned char r_, g_, b_ ;
+};
+
+class CSSColorParseException: public std::runtime_error {
+public:
+    CSSColorParseException(const std::string &msg): std::runtime_error(msg) {}
+} ;
+
 // list of named colors
 
-struct NamedColor {
+struct NamedColor: public CSSColor {
 public:
+
+    NamedColor(unsigned char r, unsigned char g, unsigned char b): CSSColor(r, g, b) {}
 
     static NamedColor alice_blue() noexcept;
     static NamedColor antique_white() noexcept;
@@ -191,8 +210,6 @@ public:
     static NamedColor white_smoke() noexcept;
     static NamedColor yellow() noexcept;
     static NamedColor yellow_green() noexcept;
-
-    unsigned char r_, g_, b_ ;
 
     NamedColor() = delete ;
 

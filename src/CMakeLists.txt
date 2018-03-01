@@ -19,6 +19,28 @@ SET ( XG_FILES
     ${INCLUDE_ROOT}/vector.hpp
     ${INCLUDE_ROOT}/rectangle.hpp
     ${INCLUDE_ROOT}/xform.hpp
+
+    ${INCLUDE_ROOT}/util/variant.hpp
+    ${INCLUDE_ROOT}/util/dictionary.hpp
+
+    ${SRC_ROOT}/util/dictionary.cpp
+    ${SRC_ROOT}/util/strings.cpp
+
+    ${SRC_ROOT}/svg/svg_parser.cpp
+    ${SRC_ROOT}/svg/svg_parser.hpp
+    ${SRC_ROOT}/svg/svg_document.cpp
+    ${SRC_ROOT}/svg/svg_dom.cpp
+    ${SRC_ROOT}/svg/svg_length.cpp
+    ${SRC_ROOT}/svg/svg_length.hpp
+    ${SRC_ROOT}/svg/svg_style.cpp
+    ${SRC_ROOT}/svg/svg_style.hpp
+    ${SRC_ROOT}/svg/svg_parse_util.cpp
+    ${SRC_ROOT}/svg/svg_parse_util.hpp
+
+
+    ${INCLUDE_ROOT}/svg_document.hpp
+
+
 )
 
 add_library(xg SHARED ${XG_FILES})
@@ -28,4 +50,5 @@ TARGET_LINK_LIBRARIES(xg
     ${CAIRO_LIBRARIES}
     ${HARFBUZZ_LIBRARIES}
     ${ICU_LIBRARIES}
+    ${EXPAT_LIBRARIES}
 )

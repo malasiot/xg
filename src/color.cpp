@@ -44,7 +44,7 @@ static int css_clip_rgb (int rgb)
     return rgb;
 }
 
-static bool parse_css_color(const string &str, uint &r, uint &g, uint &b) {
+static bool parse_css_color(const string &str, unsigned char &r, unsigned char &g, unsigned char &b) {
     static regex clr_regex_1("#([0-9a-f])([0-9a-f])([0-9a-f])(?:([0-9a-f])([0-9a-f])([0-9a-f]))?", std::regex::icase) ;
     static regex clr_regex_2("rgb\\([\\s]*([0-9]+)[\\s]*,[\\s]*([0-9]+)[\\s]*,[\\s]*([0-9]+)[\\s]*\\)[\\s]*", std::regex::icase) ;
     static regex clr_regex_3("rgb\\([\\s]*([0-9]+)\\%[\\s]*,[\\s]*([0-9]+)\\%[\\s]*,[\\s]*([0-9]+)[\\s]*\\)[\\s]*", std::regex::icase) ;
@@ -259,16 +259,16 @@ static bool parse_css_color(const string &str, uint &r, uint &g, uint &b) {
 }
 
 
-Color::Color(const string &css_color_spec, double alpha): a_(alpha)
+CSSColor::CSSColor(const string &css_color_spec)
 {
-    unsigned int r, g, b ;
-    if ( parse_css_color(css_color_spec, r, g, b) ) {
-        r_ = r/255.0 ; g_ = g/255.0 ; b_ = b/255.0 ;
+    if ( !parse_css_color(css_color_spec, r_, g_, b_) ) {
+        stringstream strm ;
+        strm << "invalid CSS color: " << css_color_spec ;
+        throw CSSColorParseException(strm.str()) ;
     }
-
 }
 
-Color::Color(const NamedColor &clr, double alpha): r_(clr.r_/255.0), g_(clr.g_/255.0), b_(clr.b_/255), a_(clamp(alpha)) {
+Color::Color(const CSSColor &clr, double alpha): r_(clr.r_/255.0), g_(clr.g_/255.0), b_(clr.b_/255.0), a_(clamp(alpha)) {
 }
 
 NamedColor NamedColor::alice_blue() noexcept { return {240, 248, 255} ; }
