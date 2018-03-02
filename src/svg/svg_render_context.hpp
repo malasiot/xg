@@ -17,10 +17,10 @@ public:
 
       void pushState(const Style &) ;
       void popState() ;
-      void pushTransform(const Transform &) ;
+      void pushTransform(const Matrix2d &) ;
       void popTransform() ;
 
-      void preRenderShape(const Style &s, const Transform &tr) ;
+      void preRenderShape(const Style &s, const Matrix2d &tr) ;
       void postRenderShape() ;
       void renderShape() ;
 
@@ -37,7 +37,7 @@ public:
 
       Canvas &canvas_ ;
       std::deque<Style> states_ ;
-      std::deque<Transform> transforms_ ;
+      std::deque<Matrix2d> transforms_ ;
       std::deque<ViewBox> view_boxes_ ;
 
       ViewBox obbox_  ;

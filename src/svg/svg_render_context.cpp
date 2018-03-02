@@ -1,5 +1,7 @@
 #include "svg_render_context.hpp"
 
+using namespace std ;
+
 namespace xg {
 namespace svg {
 
@@ -121,9 +123,95 @@ void RenderingContext::popState() {
     states_.pop_back() ;
 }
 
-void RenderingContext::preRenderShape(const Style &s, const Transform &tr)
-{
+void RenderingContext::pushTransform(const Matrix2d &trs) {
+    transforms_.push_back(trs) ;
+}
 
+void RenderingContext::popTransform() {
+    transforms_.pop_back() ;
+}
+
+ElementPtr RenderingContext::lookupRef(const std::string &name) {
+    auto it = refs_.find(name) ;
+
+    if ( it == refs_.end() ) return nullptr ;
+    else return (*it).second ;
+}
+
+void RenderingContext::populateRefs(const ElementPtr &root) {
+    if ( root->getType() == Element::DocumentElement )
+    {
+        Document *pElem = dynamic_cast<Document *>(root.get()) ;
+
+        for( int i=0 ; i<pElem->children_.size() ; i++ )
+        {
+            ElementPtr el = pElem->children_[i] ;
+
+            string id = el->id_ ;
+
+            if ( !id.empty() ) refs_['#' + id] = el ;
+
+            if ( el->getType() == Element::DocumentElement ||
+                 el->getType() == Element::GroupElement ||
+                 el->getType() == Element::DefsElement ) populateRefs(el) ;
+        }
+    }
+    else if ( root->getType() == Element::GroupElement )
+    {
+        Group *pElem = dynamic_cast<Group *>(root.get()) ;
+
+        for( int i=0 ; i<pElem->children_.size() ; i++ )
+        {
+            ElementPtr el = pElem->children_[i] ;
+
+            string id = el->id_ ;
+
+            if ( !id.empty() ) refs_['#' + id] = el ;
+
+            if ( el->getType() == Element::DocumentElement ||
+                 el->getType() == Element::GroupElement ||
+                 el->getType() == Element::DefsElement ) populateRefs(el) ;
+        }
+    }
+    else if ( root->getType() == Element::DefsElement )
+    {
+        Defs *pElem = dynamic_cast<Defs *>(root.get()) ;
+
+        for( int i=0 ; i<pElem->children_.size() ; i++ )
+        {
+            ElementPtr el = pElem->children_[i] ;
+
+            string id = el->id_ ;
+
+            if ( !id.empty() ) refs_['#' + id] = el ;
+
+            if ( el->getType() == Element::DocumentElement ||
+                 el->getType() == Element::GroupElement ||
+                 el->getType() == Element::DefsElement ) populateRefs(el) ;
+        }
+    }
+}
+
+void RenderingContext::preRenderShape(const Style &s, const Matrix2d &t)
+{
+    pushState(s) ;
+    pushTransform(t) ;
+
+    Style &st = states_.back() ;
+
+    canvas_.save() ;
+    canvas_.setTransform(t) ;
+
+    if ( rendering_mode_ == RenderingMode::Display ) {
+        string cp_id = st.getClipPath() ;
+        if ( !cp_id.empty() ) {
+          ElementPtr p = lookupRef(cp_id) ;
+
+          if ( p ) {
+              auto e = std::dynamic_pointer_cast<ClipPathElement>(p) ;
+          }
+      }
+    }
 }
 
 void RenderingContext::postRenderShape()
@@ -163,7 +251,7 @@ void RenderVisitor::visit(PathElement &)
 
 void RenderVisitor::visit(RectElement &rect)
 {
-    ctx_.preRenderShape(rect.style_, rect.trans_) ;
+    ctx_.preRenderShape(rect.style_, rect.trans_.m_) ;
 
     double rxp = ctx_.toPixels(rect.rx_, LengthDirection::Horizontal) ;
     double ryp = ctx_.toPixels(rect.ry_, LengthDirection::Vertical) ;

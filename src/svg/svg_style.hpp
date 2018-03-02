@@ -81,6 +81,11 @@ class Style
         return findAttribute<FillRule>(StyleAttributeType::FillRule, FillRule::NonZero) ;
     }
 
+    std::string getClipPath() const {
+        return findAttribute<std::string>(StyleAttributeType::ClipPath, std::string()) ;
+    }
+
+
     template<typename T>
     T findAttribute(StyleAttributeType type, const T &default_val) const {
         auto it = attributes_.find(type) ;
