@@ -8,7 +8,7 @@ using namespace std ;
 namespace xg {
 namespace svg {
 
-void DocumentNode::parseAttributes(const xg::Dictionary &attrs) {
+void SVGElement::parseAttributes(const xg::Dictionary &attrs) {
 
     Element::parseAttributes(attrs) ;
     Stylable::parseAttributes(attrs) ;
@@ -214,7 +214,7 @@ void GradientElement::parseAttributes(const Dictionary &attrs)
     }
 }
 
-void LinearGradient::parseAttributes(const Dictionary &attrs)
+void LinearGradientElement::parseAttributes(const Dictionary &attrs)
 {
     GradientElement::parseAttributes(attrs) ;
 
@@ -224,7 +224,7 @@ void LinearGradient::parseAttributes(const Dictionary &attrs)
     parse_element_attribute("y2", attrs, y2_) ;
 }
 
-void RadialGradient::parseAttributes(const Dictionary &attrs)
+void RadialGradientElement::parseAttributes(const Dictionary &attrs)
 {
     GradientElement::parseAttributes(attrs) ;
 
@@ -236,7 +236,7 @@ void RadialGradient::parseAttributes(const Dictionary &attrs)
 }
 
 
-void Pattern::parseAttributes(const Dictionary &attrs)
+void PatternElement::parseAttributes(const Dictionary &attrs)
 {
     Element::parseAttributes(attrs) ;
     Stylable::parseAttributes(attrs) ;
@@ -277,5 +277,319 @@ void Stop::parseAttributes(const Dictionary &attrs) {
 
     parse_element_attribute("offset", attrs, offset_) ;
 }
+
+void ImageElement::parseAttributes(const Dictionary &attrs)
+{
+    Element::parseAttributes(attrs) ;
+    Stylable::parseAttributes(attrs) ;
+    Transformable::parseAttributes(attrs) ;
+
+    parse_element_attribute("x", attrs, x_) ;
+    parse_element_attribute("y", attrs, y_) ;
+    parse_element_attribute("width", attrs, width_) ;
+    parse_element_attribute("height", attrs, height_) ;
+
+    parse_element_attribute("preserveAspectRatio", attrs, preserve_aspect_ratio_) ;
+    parse_element_attribute("xlink::href", attrs, uri_) ;
+}
+
+void StyleElement::parseAttributes(const Dictionary &attrs) {
+    Element::parseAttributes(attrs) ;
+
+    media_ = attrs.get("media") ;
+    type_ = attrs.get("type") ;
+    title_ = attrs.get("title") ;
+}
+
+void ClipPathElement::parseAttributes(const Dictionary &attrs)
+{
+    Element::parseAttributes(attrs) ;
+    Stylable::parseAttributes(attrs) ;
+    Transformable::parseAttributes(attrs) ;
+
+    attrs.visit("clipPathUnits", [&](const string &val) {
+        if ( val == "userSpaceOnUse" )
+             clip_path_units_ = ClipPathUnits::UserSpaceOnUse ;
+         else if ( val == "objectBoundingBox" )
+             clip_path_units_ = ClipPathUnits::ObjectBoundingBox ;
+    }) ;
+
+}
+
+void UseElelement::parseAttributes(const Dictionary &attrs)
+{
+    Element::parseAttributes(attrs) ;
+    Stylable::parseAttributes(attrs) ;
+    Transformable::parseAttributes(attrs) ;
+
+    parse_element_attribute("x", attrs, x_) ;
+    parse_element_attribute("y", attrs, y_) ;
+    parse_element_attribute("width", attrs, width_) ;
+    parse_element_attribute("height", attrs, height_) ;
+
+    parse_element_attribute("xlink::href", attrs, uri_) ;
+}
+
+void GroupElement::parseAttributes(const Dictionary &attrs)
+{
+    Element::parseAttributes(attrs) ;
+    Stylable::parseAttributes(attrs) ;
+    Transformable::parseAttributes(attrs) ;
+}
+
+void DefsElement::parseAttributes(const Dictionary &attrs)
+{
+    Element::parseAttributes(attrs) ;
+    Stylable::parseAttributes(attrs) ;
+    Transformable::parseAttributes(attrs) ;
+}
+
+void PathElement::parseAttributes(const Dictionary &attrs)
+{
+    Element::parseAttributes(attrs) ;
+    Stylable::parseAttributes(attrs) ;
+    Transformable::parseAttributes(attrs) ;
+
+    parse_element_attribute("d", attrs, path_) ;
+}
+
+void RectElement::parseAttributes(const Dictionary &attrs)
+{
+    Element::parseAttributes(attrs) ;
+    Stylable::parseAttributes(attrs) ;
+    Transformable::parseAttributes(attrs) ;
+
+    parse_element_attribute("x", attrs, x_) ;
+    parse_element_attribute("y", attrs, y_) ;
+    parse_element_attribute("width", attrs, width_) ;
+    parse_element_attribute("height", attrs, height_) ;
+    parse_element_attribute("rx", attrs, rx_) ;
+    parse_element_attribute("rx", attrs, ry_) ;
+}
+
+void CircleElement::parseAttributes(const Dictionary &attrs)
+{
+    Element::parseAttributes(attrs) ;
+    Stylable::parseAttributes(attrs) ;
+    Transformable::parseAttributes(attrs) ;
+
+    parse_element_attribute("cx", attrs, cx_) ;
+    parse_element_attribute("cy", attrs, cy_) ;
+    parse_element_attribute("r", attrs, r_) ;
+}
+
+void EllipseElement::parseAttributes(const Dictionary &attrs)
+{
+    Element::parseAttributes(attrs) ;
+    Stylable::parseAttributes(attrs) ;
+    Transformable::parseAttributes(attrs) ;
+
+    parse_element_attribute("cx", attrs, cx_) ;
+    parse_element_attribute("cy", attrs, cy_) ;
+    parse_element_attribute("rx", attrs, rx_) ;
+    parse_element_attribute("ry", attrs, ry_) ;
+}
+
+void LineElement::parseAttributes(const Dictionary &attrs)
+{
+    Element::parseAttributes(attrs) ;
+    Stylable::parseAttributes(attrs) ;
+    Transformable::parseAttributes(attrs) ;
+
+    parse_element_attribute("x1", attrs, x1_) ;
+    parse_element_attribute("y1", attrs, y1_) ;
+    parse_element_attribute("x2", attrs, x2_) ;
+    parse_element_attribute("y2", attrs, y2_) ;
+}
+
+void PolylineElement::parseAttributes(const Dictionary &attrs)
+{
+    Element::parseAttributes(attrs) ;
+    Stylable::parseAttributes(attrs) ;
+    Transformable::parseAttributes(attrs) ;
+
+    parse_element_attribute("points", attrs, points_) ;
+}
+
+void PolygonElelemnt::parseAttributes(const Dictionary &attrs)
+{
+    Element::parseAttributes(attrs) ;
+    Stylable::parseAttributes(attrs) ;
+    Transformable::parseAttributes(attrs) ;
+
+    parse_element_attribute("points", attrs, points_) ;
+}
+
+void PointList::parse(const string &str)
+{
+    vector<float> pts ;
+    if ( !parse_coordinate_list(str, pts) || pts.size() % 2 )
+        throw SVGDOMAttributeValueException("invalid point list") ;
+    for( uint i=0 ; i<pts.size() ; i+=2 )
+        points_.emplace_back(pts[i], pts[i+1]) ;
+}
+
+void PathData::parse(const string &str) {
+
+     bool inside_group = false, is_first = true ;
+     float arg1, arg2, arg3, arg4, arg5, arg6, arg7 ;
+
+     static regex path_rx("(?:([mMsShHvVlLcCQqQtTaA]+)([^mMsShHvVlLcCqQtTaAzZ]+))|([zZ])[\\s]*") ;
+
+     sregex_iterator it(str.begin(), str.end(), path_rx) ;
+     sregex_iterator end ;
+
+     while ( it != end ) {
+         string args ;
+         char cmd ;
+         vector<float> argList ;
+
+
+         if ( it->str(3).empty() ) {
+             cmd = it->str(1).at(0) ;
+             args = it->str(2) ;
+
+             if ( !parse_coordinate_list(args, argList) )
+                 throw SVGDOMAttributeValueException("invalid path data string") ;
+         }
+         else
+             cmd = 'z' ;
+
+         if ( cmd == 'M' || cmd == 'm' )  {
+
+             bool is_rel = ( cmd == 'm') ;
+             inside_group = true ;
+
+             // the first is a move
+             if ( cmd == 'm' ) path_.moveToRel(argList[0], argList[1]) ;
+             else path_.moveTo(argList[0], argList[1]) ;
+
+             // the rest of coordinates are interpreted as lineto
+
+             is_first = false ;
+
+             for(int i=2 ; i<argList.size() ; i += 2) {
+                 arg1 = argList[i] ;
+                 arg2 = argList[i+1] ;
+
+                 if ( is_rel ) path_.lineToRel(arg1, arg2) ;
+                 else path_.lineTo(arg1, arg2) ;
+             }
+         }
+         else if ( cmd == 'z' )  {
+             inside_group = false ;
+             path_.closePath() ;
+         }
+         else if ( cmd == 'l' || cmd == 'L' ) {
+             bool is_rel = ( cmd == 'l' ) ;
+
+             for(int i=0 ; i<argList.size() ; i += 2) {
+                 arg1 = argList[i] ;
+                 arg2 = argList[i+1] ;
+
+                 if ( is_rel ) path_.lineToRel(arg1, arg2) ;
+                 else path_.lineTo(arg1, arg2) ;
+             }
+         }
+         else if ( cmd == 'h' || cmd == 'H' ) {
+             bool is_rel = (cmd == 'h') ;
+
+             for( int i=0 ; i<argList.size() ; i++ ) {
+                 float arg = argList[i] ;
+
+                 if ( is_rel ) path_.lineToHorzRel(arg) ;
+                 else path_.lineToHorz(arg) ;
+             }
+         }
+         else if ( cmd == 'v' || cmd == 'V' )  {
+             bool is_rel = (cmd == 'v') ;
+
+             for( int i=0 ; i<argList.size() ; i++ ) {
+                 float arg = argList[i] ;
+
+                 if ( is_rel ) path_.lineToVertRel(arg) ;
+                 else path_.lineToVert(arg) ;
+             }
+         }
+         else if ( cmd == 'c' || cmd == 'C' ) {
+             bool is_rel = (cmd == 'c') ;
+
+             for ( int i=0 ; i<argList.size() ; i+=6 ) {
+                 arg1 = argList[i] ;
+                 arg2 = argList[i+1] ;
+                 arg3 = argList[i+2] ;
+                 arg4 = argList[i+3] ;
+                 arg5 = argList[i+4] ;
+                 arg6 = argList[i+5] ;
+
+                 if ( is_rel ) path_.curveToRel(arg1, arg2, arg3, arg4, arg5, arg6) ;
+                 else path_.curveTo(arg1, arg2, arg3, arg4, arg5, arg6) ;
+             }
+         }
+         else if ( cmd == 's' || cmd == 'S' )  {
+             bool is_rel = (cmd == 's') ;
+
+             for( int i=0 ; i<argList.size() ; i+=4 ) {
+                 arg3 = argList[i] ;
+                 arg4 = argList[i+1] ;
+                 arg5 = argList[i+2] ;
+                 arg6 = argList[i+3] ;
+
+                 if ( is_rel ) path_.smoothCurveToRel(arg3, arg4, arg5, arg6) ;
+                 else path_.smoothCurveTo(arg3, arg4, arg5, arg6) ;
+             }
+         }
+         else if ( cmd == 'Q' || cmd == 'q' ) {
+             bool is_rel = (cmd == 'q') ;
+
+             for( int i=0 ; i<argList.size() ; i+=4 ) {
+                 arg1 = argList[i] ;
+                 arg2 = argList[i+1] ;
+                 arg3 = argList[i+2] ;
+                 arg4 = argList[i+3] ;
+
+                 if ( is_rel ) path_.quadToRel(arg1, arg2, arg3, arg4) ;
+                 else path_.quadTo(arg1, arg2, arg3, arg4) ;
+             }
+         }
+         else if ( cmd == 'T' || cmd == 't' ) {
+             bool is_rel = (cmd == 't') ;
+
+             for( int i=0 ; i<argList.size() ; i+=2 ) {
+                 arg3 = argList[i] ;
+                 arg4 = argList[i+1] ;
+
+                 if ( is_rel ) path_.smoothQuadToRel(arg3, arg4) ;
+                 else path_.smoothQuadToRel(arg3, arg4) ;
+             }
+         }
+         else if ( cmd == 'A' || cmd == 'a' ) {
+             bool is_rel = (cmd == 'a') ;
+
+             for ( int k=0 ; k<argList.size() ; k+=7 ) {
+                 arg1 = argList[k] ;
+                 arg2 = argList[k+1] ;
+                 arg3 = argList[k+2] ;
+                 arg4 = argList[k+3] ;
+                 arg5 = argList[k+4] ;
+                 arg6 = argList[k+5] ;
+                 arg7 = argList[k+6] ;
+
+                 if ( is_rel ) path_.arcToRel(arg1, arg2, arg3, arg4, arg5, arg6, arg7) ;
+                 else path_.arcTo(arg1, arg2, arg3, arg4, arg5, arg6, arg7) ;
+             }
+         }
+
+         ++it ;
+     }
+
+}
+
+void TextElement::parseAttributes(const Dictionary &a)
+{
+
+}
+
+
 }
 }

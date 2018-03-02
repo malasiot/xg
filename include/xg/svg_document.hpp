@@ -9,7 +9,7 @@
 namespace xg {
 
 namespace svg {
-class DocumentNode ;
+class SVGElement ;
 }
 
 // Encapsulates the SVG dom
@@ -22,7 +22,7 @@ private:
 
     friend class SVGParser;
 
-    std::shared_ptr<svg::DocumentNode> root_ ;
+    std::shared_ptr<svg::SVGElement> root_ ;
 };
 
 

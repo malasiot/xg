@@ -50,7 +50,14 @@ string Dictionary::get(const string &key, const string &defaultVal) const
     const_iterator it = find(key) ;
 
     if ( it != end() ) return (*it).second ;
-	else return defaultVal ;
+    else return defaultVal ;
+}
+
+void Dictionary::visit(const string &key, std::function<void (const string &)> cb) const
+{
+    const_iterator it = find(key) ;
+
+    if ( it != end() ) cb(it->second) ;
 }
 	
 bool Dictionary::contains(const string &key) const

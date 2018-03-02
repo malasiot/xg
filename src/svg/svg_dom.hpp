@@ -4,6 +4,7 @@
 #include <string>
 #include <xg/util/dictionary.hpp>
 #include <xg/xform.hpp>
+#include <xg/path.hpp>
 
 #include "svg_length.hpp"
 #include "svg_dom_exceptions.hpp"
@@ -13,69 +14,53 @@ namespace xg {
 namespace svg {
 
 class ViewBox {
-  public:
+public:
 
     ViewBox() = default ;
 
-    void parse(const std::string &str) ;
+    void parse(const std::string &s) ;
 
     float x_ = 0, y_ = 0, width_ = 0 , height_ = 0 ;
 } ;
 
 class PathData
 {
-  public:
+public:
 
     enum Command { MoveToCmd, ClosePathCmd, LineToCmd, CurveToCmd, SmoothCurveToCmd,
-        QuadCurveToCmd, SmoothQuadCurveToCmd, EllipticArcToCmd } ;
+                   QuadCurveToCmd, SmoothQuadCurveToCmd, EllipticArcToCmd } ;
 
     PathData() {}
 
-    bool parse(const std::string &str) ;
+    void parse(const std::string &str) ;
 
     struct Element {
         Element(Command cc, double arg1 = 0, double arg2 = 0, double arg3 = 0, double arg4 = 0,
-            double arg5 = 0, double arg6 = 0) {
+                double arg5 = 0, double arg6 = 0) {
             cmd = cc ;
             args_[0] = arg1 ; args_[1] = arg2 ; args_[2] = arg3 ; args_[3] = arg4 ; args_[4] = arg5 ;
             args_[5] = arg6 ;
         }
         double args_[6] ;
-      Command cmd ;
+        Command cmd ;
     } ;
 
     std::vector<Element> elements_ ;
+
+    Path path_ ;
 } ;
-
-
-
-
-
-
-#define DASH_ARRAY_LENGTH 10
-
-struct Color {
-
-    Color(double r, double g, double b, double a = 1.0) ;
-
-    // initialize from a CSS2 name or rgb specification
-    Color(const char *name, double alpha = 1.0) ;
-
-    double r_, g_, b_, a_ ;
-};
 
 
 class PointList {
-  public:
+public:
 
-    bool parse(const std::string &str) ;
+    void parse(const std::string &str) ;
 
-    std::vector<float> points_ ;
-
+    std::vector<Point2d> points_ ;
 } ;
 
 class Transform {
-  public:
+public:
 
     Transform() = default ;
 
@@ -87,10 +72,10 @@ class Transform {
 
 class PreserveAspectRatio
 {
-  public:
+public:
 
     enum ViewBoxAlign { NoViewBoxAlign, XMinYMin, XMidYMin, XMaxYMin, XMinYMid, XMidYMid, XMaxYMid,
-        XMinYMax, XMidYMax, XMaxYMax } ;
+                        XMinYMax, XMidYMax, XMaxYMax } ;
     enum ViewBoxPolicy { MeetViewBoxPolicy, SliceViewBoxPolicy } ;
 
     PreserveAspectRatio(): view_box_align_(XMidYMid), view_box_policy_(MeetViewBoxPolicy), defer_aspect_ratio_(false) {}
@@ -117,7 +102,7 @@ public:
 
 class Transformable
 {
-    public:
+public:
 
     virtual ~Transformable() {}
 
@@ -128,7 +113,7 @@ class Transformable
 
 class FitToViewBox
 {
-  public:
+public:
 
     void parseAttributes(const Dictionary &attrs) ;
 
@@ -137,86 +122,123 @@ class FitToViewBox
 
 } ;
 
-class RenderingContext ;
+class URI {
+public:
+
+    void parse(const std::string &val) {
+        href_ = val ; // not parsed
+    }
+
+    std::string href_ ;
+} ;
+
+// base class of all SVG elements
 
 class Element
 {
-  public:
+public:
 
-    enum Type { DocumentElement, GroupElement, AnchorElement, PathElement, SwitchElement, DefsElement, UseElement, LineElement,
-        RectElement, EllipseElement, CircleElement, PolygonElement, PolyLineElement, SymbolElement,
-        MaskElement, ClipPathElement, ImageElement, MarkerElement, StopElement, PatternElement,
-        LinearGradientElement, ConicalGradientElement, RadialGradientElement, FilterElement, MyltiImageElement,
-        SubImageRefElement, SubImageElement, TextElement, TSpanElement, TRefElement, StyleElement
-    } ;
+    Element() = default ;
+    virtual ~Element() = default ;
 
-  public:
+    void parseAttributes(const Dictionary &a) ;
 
-    Element() { }
-    virtual ~Element() { }
+    using ElementPtr = std::shared_ptr<Element> ;
 
-    virtual bool isContainer() const { return false ; }
+    virtual bool canHaveChild(const ElementPtr &p) const { return false ; }
 
-    void parseAttributes(const Dictionary &pNode) ;
-
-    virtual Type getType() const = 0 ;
+    bool addChild(const ElementPtr &p) {
+        if ( !canHaveChild(p) ) return false ;
+        children_.emplace_back(p) ;
+        p->parent_ = this ;
+        return true ;
+    }
 
     std::string id_ ;
     Element *parent_ = nullptr ;
+
+    std::vector<ElementPtr> children_ ;
 } ;
 
-typedef std::shared_ptr<Element> ElementPtr ;
 
-class StyleDefinition: public Element
-{
-  public:
+class CircleElement ;
+class LineElement ;
+class PolylineElement ;
+class PolygonElelemnt ;
+class PathElement ;
+class RectElement ;
+class EllipseElement ;
+class DefsElement ;
+class GroupElement ;
+class SymbolElement ;
+class UseElelement ;
+class ClipPathElement ;
+class ImageElement ;
+class TextElement ;
+class LinearGradientElement ;
+class RadialGradientElement ;
+class PatternElement ;
+class TextSpanElement ;
+class SVGElement ;
+class StyleElement ;
 
-    StyleDefinition() {}
+// Helper class to define container elements that can contain children belonginf only within a set of types
 
-    Type getType() const { return Element::StyleElement ; }
-    virtual bool fromXml(const Dictionary &pNode) ;
-
-    std::string type_, media_ ;
-} ;
-
-class StylableElement: public Element, public Stylable {
-} ;
-
-class Stop: public Element, public Stylable
-{
-  public:
-
-    Stop(): offset_(0.0) {
+template<typename...>
+struct Container: public Element {
+    static bool accepts(const std::shared_ptr<svg::Element> &ele) {
+        return false ;
     }
+};
+
+template<typename T, typename... Ts>
+struct Container<T, Ts...>: public Element {
+    static bool accepts(const std::shared_ptr<svg::Element> &ele) {
+        if ( std::dynamic_pointer_cast<T>(ele) ) return true ;
+        else return Container<Ts...>::accepts(ele) ;
+    }
+
+    bool canHaveChild(const std::shared_ptr<Element> &p) const override { return accepts(p) ; }
+};
+
+using GroupContainer =  Container<CircleElement, LineElement, PolylineElement, PolygonElelemnt, RectElement, PathElement, EllipseElement,
+DefsElement, SVGElement, GroupElement, SymbolElement, UseElelement, LinearGradientElement, RadialGradientElement,
+ClipPathElement, ImageElement, PatternElement, StyleElement, TextElement> ;
+
+using ShapeContainer = Container<CircleElement, LineElement, PolylineElement, PolygonElelemnt, RectElement, PathElement, EllipseElement, UseElelement, TextElement> ;
+
+class StyleElement: public Element {
+public:
+
+    StyleElement() = default ;
+
+    void parseAttributes(const Dictionary &) ;
+
+    std::string type_, media_, title_ ;
+} ;
+
+
+class Stop: public Element, public Stylable {
+public:
+
+    Stop(): offset_(0.0) {}
 
     void parseAttributes(const Dictionary &p) ;
 
-    Length offset_ ;
+    Length offset_{0.0} ;
 } ;
 
-class Container {
 
-public:
-
-    virtual ~Container() {}
-
-    std::vector<ElementPtr> children_ ;
-};
 
 enum class GradientSpreadMethod { Unknown, Pad, Reflect, Repeat } ;
 enum class GradientUnits { UserSpaceOnUse, ObjectBoundingBox } ;
 
-class GradientElement: public Element, public Stylable, public Container
-{
-  public:
+class GradientElement: public Container<Stop>, public Stylable {
+public:
 
     GradientElement(): spread_method_(GradientSpreadMethod::Pad), gradient_units_(GradientUnits::ObjectBoundingBox) { }
 
     void parseAttributes(const Dictionary &pNode) ;
-    void parseStops(const Dictionary &pNode) ;
-
-    enum Fallback { SpreadMethodDefined = 0x01, GradientUnitsDefined = 0x02, TransformDefined = 0x04 } ;
-    void resolveHRef(RenderingContext *ctx) ;
 
     GradientSpreadMethod spread_method_ ;
     GradientUnits gradient_units_ ;
@@ -224,288 +246,208 @@ class GradientElement: public Element, public Stylable, public Container
     std::string href_ ;
 } ;
 
-class LinearGradient: public GradientElement
-{
-  public:
+class LinearGradientElement: public GradientElement {
+public:
 
-    LinearGradient() {
-        x1_ = y1_ = y2_ = x2_ = Length(0.5_perc) ;
-    }
+    LinearGradientElement() { x1_ = y1_ = y2_ = x2_ = Length(0.5_perc) ; }
 
-    Type getType() const { return LinearGradientElement ; }
-
-    void parseAttributes(const Dictionary &pNode) ;
-
+    void parseAttributes(const Dictionary &a) ;
 
     Length x1_, y1_, x2_, y2_ ;
 } ;
 
-class RadialGradient: public GradientElement
-{
-  public:
+class RadialGradientElement: public GradientElement {
+public:
 
-    RadialGradient() {
+    RadialGradientElement() {
         cx_ = cy_ = r_ = fx_ = fy_  = Length(0.5_perc) ;
     }
 
-    void parseAttributes(const Dictionary &pNode) ;
-
-    Type getType() const { return RadialGradientElement ; }
+    void parseAttributes(const Dictionary &a) ;
 
     Length cx_, cy_, r_, fx_, fy_ ;
 } ;
 
 enum class PatternUnits { UserSpaceOnUse, ObjectBoundingBox } ;
 
-class Pattern: public Element, public Stylable, public FitToViewBox, public Container
+class PatternElement:
+        public GroupContainer,
+        public Stylable, public FitToViewBox
 {
-  public:
+public:
 
+    PatternElement(): pattern_content_units_(PatternUnits::UserSpaceOnUse), pattern_units_(PatternUnits::ObjectBoundingBox) {  }
 
-    Pattern(): pattern_content_units_(PatternUnits::UserSpaceOnUse), pattern_units_(PatternUnits::ObjectBoundingBox) {  }
-
-    Type getType() const { return Element::PatternElement ; }
-
-    void parseAttributes(const Dictionary &pNode) ;
-    bool fromXml(const Dictionary &pNode) ;
-
-    void render(RenderingContext *ctx) ;
-
-    enum Fallback { PatternUnitsDefined = 0x01, PatternContentUnitsDefined = 0x02, TransformDefined = 0x04 } ;
-
-    void ResolveHRef(RenderingContext *ctx) ;
+    void parseAttributes(const Dictionary &a) ;
 
     PatternUnits pattern_units_ ;
     PatternUnits pattern_content_units_ ;
     Transform trans_ ;
     std::string href_ ;
     Length x_, y_, width_, height_ ;
-
 } ;
 
 
-class Image: public Element, public Transformable, public Stylable
+class ImageElement: public Element, public Transformable, public Stylable
 {
 public:
 
-    Image() {
-        x_ = y_ = width_ = height_ = 0 ;
-    }
-    Type getType() const { return ImageElement ; }
+    ImageElement() = default ;
 
-    bool fromXml(const Dictionary &pNode) ;
-    virtual void render(RenderingContext *)  ;
+    void parseAttributes(const Dictionary &attrs) ;
 
-    std::string img_path_ ;
-    Length x_, y_, width_, height_ ;
+    URI uri_ ;
+    Length x_{0}, y_{0}, width_{0}, height_{0} ;
     PreserveAspectRatio preserve_aspect_ratio_ ;
 } ;
 
-class ClipPath: public Element, public Transformable, public Stylable, public Container
+enum ClipPathUnits { UserSpaceOnUse, ObjectBoundingBox } ;
+
+class ClipPathElement:
+        public ShapeContainer,
+        public Transformable, public Stylable
 {
-  public:
+public:
 
-    enum ClipPathUnits { UserSpaceOnUse, ObjectBoundingBox } ;
+    ClipPathElement(): clip_path_units_(UserSpaceOnUse) {}
 
-    ClipPath(): clip_path_units_(UserSpaceOnUse) {}
-
-    Type getType() const { return ClipPathElement ; }
-
-    bool fromXml(const Dictionary &pNode) ;
-
-    virtual void render(RenderingContext *) ;
+    void parseAttributes(const Dictionary &a) ;
 
     ClipPathUnits clip_path_units_ ;
 
 } ;
 
-class Use: public Element, public Transformable, public Stylable
+class UseElelement: public GroupContainer, public Transformable, public Stylable
 {
-     public:
+public:
+    UseElelement() = default ;
 
-    Use() { x_ = y_ =  0.0 ; }
-    ~Use() { }
+    void parseAttributes(const Dictionary &a)  ;
 
-    Type getType() const { return UseElement ; }
-
-    bool fromXml(const Dictionary &pNode)  ;
-    virtual void render(RenderingContext *) ;
-
-    Length x_, y_, width_, height_ ;
-    std::string ref_id_ ;
+    Length x_{0}, y_{0}, width_, height_ ;
+    URI uri_ ;
 } ;
 
 
-class Group: public Element, public Transformable, public Stylable, public Container
+class GroupElement:
+        public GroupContainer,
+        public Transformable, public Stylable
 {
-  public:
+public:
 
-    Group() {}
+    GroupElement() = default ;
 
-    Type getType() const { return GroupElement ; }
-
-    bool fromXml(const Dictionary &pNode)  ;
-    virtual void render(RenderingContext *)  ;
+    void parseAttributes(const Dictionary &a)  ;
 } ;
 
-class Defs: public Element, public Transformable, public Stylable, public Container
-{
-  public:
+class DefsElement: public GroupContainer, public Transformable, public Stylable {
+public:
 
-    Defs() {}
+    DefsElement() = default ;
 
-    Type getType() const { return DefsElement ; }
-
-    bool fromXml(const Dictionary &pNode)  ;
-    virtual void render(RenderingContext *)  {}
+    void parseAttributes(const Dictionary &a)  ;
 } ;
 
-class Path: public Element, public Transformable, public Stylable
-{
-  public:
+class PathElement: public Element, public Transformable, public Stylable {
+public:
 
-    Path() {}
+    PathElement() = default ;
 
-    Type getType() const { return PathElement ; }
+    void parseAttributes(const Dictionary &a)  ;
 
-    bool fromXml(const Dictionary &pNode) ;
-    virtual void render(RenderingContext *) ;
-
-    PathData data_ ;
+    PathData path_ ;
 } ;
 
-class Rect: public Element, public Stylable, public Transformable
-{
-  public:
+class RectElement: public Element, public Stylable, public Transformable {
+public:
 
-    Rect() {}
+    RectElement() {}
 
-    Type getType() const { return RectElement ; }
-
-    bool fromXml(const Dictionary &pNode) ;
-    virtual void render(RenderingContext *)  ;
+    void parseAttributes(const Dictionary &a)  ;
 
     Length x_, y_, width_, height_, rx_, ry_ ;
-
 } ;
 
-class Circle: public Element,  public Stylable, public Transformable
-{
-  public:
+class CircleElement: public Element,  public Stylable, public Transformable {
+public:
 
-    Circle() {}
+    CircleElement() {}
 
-    Type getType() const { return CircleElement ; }
-
-    bool fromXml(const Dictionary &pNode) ;
-    void render(RenderingContext *) ;
+    void parseAttributes(const Dictionary &a)  ;
 
     Length cx_, cy_, r_ ;
-
 } ;
 
-class Line: public Element,  public Stylable, public Transformable
-{
-  public:
+class LineElement: public Element,  public Stylable, public Transformable {
+public:
 
-    Line() {}
+    LineElement() = default ;
 
-    Type getType() const { return LineElement ; }
-
-    bool fromXml(const Dictionary &pNode) ;
-    void render(RenderingContext *) ;
+    void parseAttributes(const Dictionary &a)  ;
 
     Length x1_, y1_, x2_, y2_ ;
 } ;
 
-class Ellipse: public Element, public Stylable, public Transformable
-{
-  public:
+class EllipseElement: public Element, public Stylable, public Transformable {
+public:
 
-    Ellipse() {}
+    EllipseElement() = default ;
 
-    Type getType() const { return EllipseElement ; }
-
-    bool fromXml(const Dictionary &pNode) ;
-    void render(RenderingContext *ctx) ;
+    void parseAttributes(const Dictionary &a)  ;
 
     Length cx_, cy_, rx_, ry_ ;
-
 } ;
 
-class PolyLine: public Element, public Stylable, public Transformable
-{
-  public:
+class PolylineElement: public Element, public Stylable, public Transformable {
+public:
 
-    PolyLine() {}
+    PolylineElement() = default ;
 
-    Type getType() const { return PolyLineElement ; }
-
-    bool fromXml(const Dictionary &pNode) ;
-    void render(RenderingContext *ctx) ;
+    void parseAttributes(const Dictionary &a)  ;
 
     PointList points_ ;
 } ;
 
-class Polygon: public Element , public Stylable, public Transformable
-{
-  public:
+class PolygonElelemnt: public Element , public Stylable, public Transformable {
+public:
 
-    Polygon() {}
+    PolygonElelemnt() = default ;
 
-    Type getType() const { return PolygonElement ; }
-
-    bool fromXml(const Dictionary &pNode) ;
-    void render(RenderingContext *ctx) ;
+    void parseAttributes(const Dictionary &a)  ;
 
     PointList points_ ;
-
 } ;
 
-class TextPosElement: public Element, public Stylable
+class TextPosElement
 {
-  public:
+public:
 
-    TextPosElement() {
-        x_ = y_ = 0 ;
-        dx_ = dy_ = 0 ;
-        preserve_white_ = false ;
-    }
-    bool parseAttributes(const Dictionary &pNode) ;
+    TextPosElement() = default ;
 
-    Length x_, y_, dx_, dy_ ;
-    bool preserve_white_ ;
+    void parseAttributes(const Dictionary &pNode) ;
 
+    Length x_{0}, y_{0}, dx_{0}, dy_{0} ;
+    bool preserve_white_{false} ;
 } ;
 
 class SpanElement ;
-class Text: public TextPosElement, public Transformable, public Container
-{
-  public:
+class TextElement: public Container<TextElement, SpanElement>, public TextPosElement, public Transformable {
+public:
 
-    Text() {}
+    TextElement() {}
 
-
-    Type getType() const { return TextElement ; }
-
-    bool fromXml(const Dictionary &pNode) ;
-    void render(RenderingContext *ctx) ;
+    void parseAttributes(const Dictionary &a) ;
 } ;
 
 
-class SpanElement: public TextPosElement, public Container
-{
-  public:
+class SpanElement: public TextPosElement, public Container<SpanElement> {
+public:
 
     SpanElement() {}
 
-    Type getType() const { return TSpanElement ; }
-
-    bool fromXml(const Dictionary &pNode) ;
-    void render(RenderingContext *ctx) ;
+    void parseAttributes(const Dictionary &a) ;
 
     std::string text_ ;
-
 } ;
 
 template<typename T>
@@ -523,19 +465,18 @@ inline void parse_element_attribute(const char *name, const Dictionary &attr, T 
         throw SVGDOMException(strm.str()) ;
     }
 }
-class DocumentNode: public Element, public Stylable, public FitToViewBox, public Container {
 
-  public:
 
-    DocumentNode(): x_{0.0}, y_{0.0},
+
+class SVGElement: public GroupContainer, public Stylable, public FitToViewBox {
+
+public:
+
+    SVGElement(): x_{0.0}, y_{0.0},
         width_{1.0_perc}, height_{1.0_perc} {
     }
 
     void parseAttributes(const Dictionary &attrs) ;
-
-    bool isContainer() const override { return true ; }
-
-    Type getType() const { return DocumentElement ; }
 
     void parseCSS(const std::string &str) ;
 
@@ -543,28 +484,20 @@ class DocumentNode: public Element, public Stylable, public FitToViewBox, public
 
 } ;
 
-class Symbol: public DocumentNode {
+class SymbolElement: public SVGElement {
 
-  public:
+public:
 
-    Symbol() {}
-
-    Type getType() const { return SymbolElement ; }
-    //bool fromXml(const Dictionary &pNode) ;
-    void render(RenderingContext *ctx) {}
-
+    SymbolElement() = default ;
 } ;
 
-
-
-
-
-
-
+class UnsupportedElement: public Element {
+public:
+     bool canHaveChild(const std::shared_ptr<Element> &p) const override { return true ; }
+     void parseAttributes(const Dictionary &) {}
+};
 
 } // namespace svg
-
-
 } //namespace xg
 
 

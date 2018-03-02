@@ -3,6 +3,7 @@
 
 #include <regex>
 #include <map>
+#include <functional>
 
 namespace xg {
 
@@ -32,6 +33,9 @@ class Dictionary: public SSMap
 	// get a the value of the given key if exists. Otherwise return defaultValue
 
     std::string get(const std::string &key, const std::string &defaultVal = std::string()) const ;
+
+    // if key exists run the given callback with corresponding value
+    void visit(const std::string &key, std::function<void(const std::string &val)> cb) const ;
 
     template<class T>
     T value(const std::string &key, const T &defaultVal) const {

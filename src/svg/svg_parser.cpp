@@ -59,16 +59,63 @@ void SVGParser::parseStream(std::istream &strm, size_t buffer_size) {
 }
 
 void SVGParser::beginElement(const string &name, const Dictionary &attributes) {
-    if ( name == "svg" ) {
-        auto node = std::make_shared<svg::DocumentNode>() ;
-        node->parseAttributes(attributes) ;
-        document_.root_ = node ;
-    }
 
+    elements_.push_back(name) ;
+
+   for( const auto &s: elements_ )
+       cout << "<" << s << "> " ;
+   cout << endl ;
+
+    if ( name == "svg" ) {
+        bool is_root = nodes_.empty() ;
+        auto node = createNode<svg::SVGElement>(attributes) ;
+        if ( is_root ) document_.root_ = node ;
+    }
+    else if ( name == "g" )
+        createNode<svg::GroupElement>(attributes) ;
+    else if ( name == "rect" )
+        createNode<svg::RectElement>(attributes) ;
+    else if ( name == "path" )
+        createNode<svg::PathElement>(attributes) ;
+    else if ( name == "line" )
+        createNode<svg::LineElement>(attributes) ;
+    else if ( name == "ellipse" )
+        createNode<svg::EllipseElement>(attributes) ;
+    else if ( name == "polyline" )
+        createNode<svg::PolylineElement>(attributes) ;
+    else if ( name == "polygon" )
+        createNode<svg::PolygonElelemnt>(attributes) ;
+    else if ( name == "circle" )
+        createNode<svg::CircleElement>(attributes) ;
+    else if ( name == "text" )
+        createNode<svg::TextElement>(attributes) ;
+    else if ( name == "defs" )
+        createNode<svg::DefsElement>(attributes) ;
+    else if ( name == "symbol" )
+        createNode<svg::SymbolElement>(attributes) ;
+    else if ( name == "linearGradient" )
+        createNode<svg::LinearGradientElement>(attributes) ;
+    else if ( name == "radialGradient" )
+        createNode<svg::RadialGradientElement>(attributes) ;
+    else if ( name == "use" )
+        createNode<svg::UseElelement>(attributes) ;
+    else if ( name == "image" )
+        createNode<svg::ImageElement>(attributes) ;
+    else if ( name == "pattern" )
+        createNode<svg::PatternElement>(attributes) ;
+    else if ( name == "clipPath" )
+        createNode<svg::ClipPathElement>(attributes) ;
+    else if ( name == "style" )
+        createNode<svg::StyleElement>(attributes) ;
+    else if ( name == "stop" )
+        createNode<svg::Stop>(attributes) ;
+    else
+        createNode<svg::UnsupportedElement>(attributes) ;
 }
 
 void SVGParser::endElement() {
-
+    nodes_.pop_back() ;
+    elements_.pop_back() ;
 }
 
 void SVGParser::start_element_handler(void *data, const char *element_name, const char **attributes)
