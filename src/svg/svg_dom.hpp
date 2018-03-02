@@ -82,7 +82,7 @@ public:
 
     void parse(const std::string &str) ;
     void constrainViewBox(double width, double height, ViewBox &orig) ;
-    Transform getViewBoxTransform(double sw, double sh, double vwidth, double vheight, double vx, double vy);
+    Matrix2d getViewBoxTransform(double sw, double sh, double vwidth, double vheight, double vx, double vy);
 
     bool defer_aspect_ratio_ ;
     ViewBoxAlign view_box_align_ ;
@@ -132,7 +132,60 @@ public:
     std::string href_ ;
 } ;
 
+
+class CircleElement ;
+class LineElement ;
+class PolylineElement ;
+class PolygonElement ;
+class PathElement ;
+class RectElement ;
+class EllipseElement ;
+class DefsElement ;
+class GroupElement ;
+class SymbolElement ;
+class UseElement ;
+class ClipPathElement ;
+class ImageElement ;
+class TextElement ;
+class LinearGradientElement ;
+class RadialGradientElement ;
+class PatternElement ;
+class TextSpanElement ;
+class SVGElement ;
+class StyleElement ;
+class Element ;
+
+class Visitor {
+public:
+    virtual void visit(SVGElement &) = 0 ;
+    virtual void visit(CircleElement &) = 0 ;
+    virtual void visit(LineElement &) = 0 ;
+    virtual void visit(PolygonElement &) = 0 ;
+    virtual void visit(PolylineElement &) = 0 ;
+    virtual void visit(PathElement &) = 0 ;
+    virtual void visit(RectElement &) = 0 ;
+    virtual void visit(EllipseElement &) = 0 ;
+    virtual void visit(DefsElement &) = 0 ;
+    virtual void visit(GroupElement &) = 0 ;
+    virtual void visit(SymbolElement &) = 0 ;
+    virtual void visit(UseElement &) = 0 ;
+    virtual void visit(ClipPathElement &) = 0 ;
+    virtual void visit(ImageElement &) = 0 ;
+    virtual void visit(TextElement &) = 0 ;
+    virtual void visit(LinearGradientElement &) = 0 ;
+    virtual void visit(RadialGradientElement &) = 0 ;
+    virtual void visit(PatternElement &) = 0 ;
+    virtual void visit(TextSpanElement &) = 0 ;
+    virtual void visit(StyleElement &) = 0 ;
+
+    virtual void visit(Element *e) ;
+    virtual void visitChildren(Element *e) ;
+} ;
+
+
 // base class of all SVG elements
+
+using ElementPtr = std::shared_ptr<Element> ;
 
 class Element
 {
@@ -142,8 +195,6 @@ public:
     virtual ~Element() = default ;
 
     void parseAttributes(const Dictionary &a) ;
-
-    using ElementPtr = std::shared_ptr<Element> ;
 
     virtual bool canHaveChild(const ElementPtr &p) const { return false ; }
 
@@ -161,26 +212,6 @@ public:
 } ;
 
 
-class CircleElement ;
-class LineElement ;
-class PolylineElement ;
-class PolygonElelemnt ;
-class PathElement ;
-class RectElement ;
-class EllipseElement ;
-class DefsElement ;
-class GroupElement ;
-class SymbolElement ;
-class UseElelement ;
-class ClipPathElement ;
-class ImageElement ;
-class TextElement ;
-class LinearGradientElement ;
-class RadialGradientElement ;
-class PatternElement ;
-class TextSpanElement ;
-class SVGElement ;
-class StyleElement ;
 
 // Helper class to define container elements that can contain children belonginf only within a set of types
 
@@ -201,11 +232,11 @@ struct Container<T, Ts...>: public Element {
     bool canHaveChild(const std::shared_ptr<Element> &p) const override { return accepts(p) ; }
 };
 
-using GroupContainer =  Container<CircleElement, LineElement, PolylineElement, PolygonElelemnt, RectElement, PathElement, EllipseElement,
-DefsElement, SVGElement, GroupElement, SymbolElement, UseElelement, LinearGradientElement, RadialGradientElement,
+using GroupContainer =  Container<CircleElement, LineElement, PolylineElement, PolygonElement, RectElement, PathElement, EllipseElement,
+DefsElement, SVGElement, GroupElement, SymbolElement, UseElement, LinearGradientElement, RadialGradientElement,
 ClipPathElement, ImageElement, PatternElement, StyleElement, TextElement> ;
 
-using ShapeContainer = Container<CircleElement, LineElement, PolylineElement, PolygonElelemnt, RectElement, PathElement, EllipseElement, UseElelement, TextElement> ;
+using ShapeContainer = Container<CircleElement, LineElement, PolylineElement, PolygonElement, RectElement, PathElement, EllipseElement, UseElement, TextElement> ;
 
 class StyleElement: public Element {
 public:
@@ -317,10 +348,10 @@ public:
 
 } ;
 
-class UseElelement: public GroupContainer, public Transformable, public Stylable
+class UseElement: public GroupContainer, public Transformable, public Stylable
 {
 public:
-    UseElelement() = default ;
+    UseElement() = default ;
 
     void parseAttributes(const Dictionary &a)  ;
 
@@ -408,10 +439,10 @@ public:
     PointList points_ ;
 } ;
 
-class PolygonElelemnt: public Element , public Stylable, public Transformable {
+class PolygonElement: public Element , public Stylable, public Transformable {
 public:
 
-    PolygonElelemnt() = default ;
+    PolygonElement() = default ;
 
     void parseAttributes(const Dictionary &a)  ;
 
@@ -430,8 +461,8 @@ public:
     bool preserve_white_{false} ;
 } ;
 
-class SpanElement ;
-class TextElement: public Container<TextElement, SpanElement>, public TextPosElement, public Transformable {
+
+class TextElement: public Container<TextElement, TextSpanElement>, public TextPosElement, public Transformable {
 public:
 
     TextElement() {}
@@ -440,10 +471,10 @@ public:
 } ;
 
 
-class SpanElement: public TextPosElement, public Container<SpanElement> {
+class TextSpanElement: public TextPosElement, public Container<TextSpanElement> {
 public:
 
-    SpanElement() {}
+    TextSpanElement() = default ;
 
     void parseAttributes(const Dictionary &a) ;
 

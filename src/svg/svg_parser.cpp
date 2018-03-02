@@ -84,7 +84,7 @@ void SVGParser::beginElement(const string &name, const Dictionary &attributes) {
     else if ( name == "polyline" )
         createNode<svg::PolylineElement>(attributes) ;
     else if ( name == "polygon" )
-        createNode<svg::PolygonElelemnt>(attributes) ;
+        createNode<svg::PolygonElement>(attributes) ;
     else if ( name == "circle" )
         createNode<svg::CircleElement>(attributes) ;
     else if ( name == "text" )
@@ -98,7 +98,7 @@ void SVGParser::beginElement(const string &name, const Dictionary &attributes) {
     else if ( name == "radialGradient" )
         createNode<svg::RadialGradientElement>(attributes) ;
     else if ( name == "use" )
-        createNode<svg::UseElelement>(attributes) ;
+        createNode<svg::UseElement>(attributes) ;
     else if ( name == "image" )
         createNode<svg::ImageElement>(attributes) ;
     else if ( name == "pattern" )

@@ -82,7 +82,6 @@ class Style
         return findAttribute<FillRule>(StyleAttributeType::FillRule, FillRule::NonZero) ;
     }
 
-
     template<typename T>
     T findAttribute(StyleAttributeType type, const T &default_val) const {
         auto it = attributes_.find(type) ;
@@ -97,6 +96,12 @@ class Style
         attributes_[t].set<T>(val) ;
     }
 
+    void extend(const Style &other) {
+        for( const auto &lp: other.attributes_ ) {
+            attributes_.insert({lp.first, lp.second}) ;
+        }
+    }
+
 private:
 
     using dash_array_t = std::vector<Length> ;
@@ -105,8 +110,6 @@ private:
         ShapeQuality, TextQuality, DisplayMode, VisibilityMode, OverflowType>;
 
     std::map<StyleAttributeType, attribute_value_t> attributes_ ;
-
-
 
     void parsePaint(const std::string &str, Paint &p)  ;
 

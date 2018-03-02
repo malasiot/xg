@@ -36,11 +36,10 @@ SET ( XG_FILES
     ${SRC_ROOT}/svg/svg_style.hpp
     ${SRC_ROOT}/svg/svg_parse_util.cpp
     ${SRC_ROOT}/svg/svg_parse_util.hpp
-
+    ${SRC_ROOT}/svg/svg_render_context.cpp
+    ${SRC_ROOT}/svg/svg_render_context.hpp
 
     ${INCLUDE_ROOT}/svg_document.hpp
-
-
 )
 
 add_library(xg SHARED ${XG_FILES})

@@ -75,6 +75,100 @@ void PreserveAspectRatio::parse(const string &str) {
 
 }
 
+void PreserveAspectRatio::constrainViewBox(double width, double height, ViewBox &orig)
+{
+    double origx = orig.x_ ;
+    double origy = orig.y_ ;
+    double origw = orig.width_ ;
+    double origh = orig.height_ ;
+
+    double neww, newh;
+
+    if ( view_box_policy_ == MeetViewBoxPolicy )
+    {
+        neww = width ;
+        newh = height ;
+
+        if ( height * origw > width * origh )
+            newh = origh * width / origw ;
+        else
+            neww = origw * height / origh;
+    }
+    else
+    {
+        neww = width ;
+        newh = height ;
+
+        if ( height * origw < width * origh )
+            newh = origh * width / origw ;
+        else
+            neww = origw * height / origh;
+    }
+
+    if ( view_box_align_ == XMinYMin  || view_box_align_ == XMinYMid  || view_box_align_ == XMinYMax  ) ;
+    else if ( view_box_align_ == XMidYMin  ||	view_box_align_ == XMidYMid  || view_box_align_ == XMidYMax  )
+        origx -= (neww - width) / 2 ;
+    else
+        origx -= neww - width ;
+
+    if ( view_box_align_ == XMinYMin || view_box_align_ == XMidYMin || view_box_align_ == XMaxYMin ) ;
+    else if ( view_box_align_ == XMinYMid || view_box_align_ == XMidYMid || view_box_align_ == XMaxYMid )
+        origy -= (newh - height) / 2;
+    else
+        origy -= newh - height ;
+
+    origw = neww ;
+    origh = newh ;
+
+    orig.x_ = origx ;
+    orig.y_ = origy ;
+    orig.width_ = origw ;
+    orig.height_ = origh ;
+}
+Matrix2d PreserveAspectRatio::getViewBoxTransform(double sw, double sh, double vwidth, double vheight, double vx, double vy)
+{
+    Matrix2d trs ;
+
+    if ( vwidth != 0.0 && vheight != 0.0 )
+    {
+        double vboxx = vx ;
+        double vboxy = vy ;
+        double vboxw = vwidth ;
+        double vboxh = vheight ;
+
+        double ofx = 0, ofy = 0 ;
+        double aspScaleX = 1.0 ;
+        double aspScaleY = 1.0 ;
+
+        if ( view_box_align_ != NoViewBoxAlign )
+        {
+            ViewBox vbox ;
+
+            vbox.x_ = vboxx ;
+            vbox.y_ = vboxy ;
+            vbox.width_ = vboxw ;
+            vbox.height_ = vboxh ;
+
+            constrainViewBox(sw, sh, vbox) ;
+
+            ofx = vbox.x_ ;
+            ofy = vbox.y_ ;
+
+            aspScaleX = vbox.width_/vwidth ;
+            aspScaleY = vbox.height_/vheight ;
+        }
+        else {
+            aspScaleX = sw/vboxw ;
+            aspScaleY = sh/vboxh ;
+        }
+
+        trs.translate(-vx, -vy) ;
+        trs.scale(aspScaleX, aspScaleY) ;
+        trs.translate(ofx, ofy) ;
+    }
+
+}
+
 void Stylable::parseAttributes(const Dictionary &p) {
     for( const auto &lp: p ) {
         string key = lp.first, val = lp.second ;
@@ -316,7 +410,7 @@ void ClipPathElement::parseAttributes(const Dictionary &attrs)
 
 }
 
-void UseElelement::parseAttributes(const Dictionary &attrs)
+void UseElement::parseAttributes(const Dictionary &attrs)
 {
     Element::parseAttributes(attrs) ;
     Stylable::parseAttributes(attrs) ;
@@ -411,7 +505,7 @@ void PolylineElement::parseAttributes(const Dictionary &attrs)
     parse_element_attribute("points", attrs, points_) ;
 }
 
-void PolygonElelemnt::parseAttributes(const Dictionary &attrs)
+void PolygonElement::parseAttributes(const Dictionary &attrs)
 {
     Element::parseAttributes(attrs) ;
     Stylable::parseAttributes(attrs) ;
@@ -588,6 +682,33 @@ void PathData::parse(const string &str) {
 void TextElement::parseAttributes(const Dictionary &a)
 {
 
+}
+
+void Visitor::visit(Element *e) {
+    if ( auto p = dynamic_cast<SVGElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<RectElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<PathElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<PolygonElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<PolylineElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<CircleElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<EllipseElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<DefsElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<GroupElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<SymbolElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<UseElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<ClipPathElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<ImageElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<TextElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<TextSpanElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<LinearGradientElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<RadialGradientElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<PatternElement *>(e) ) visit(*p) ;
+    else if ( auto p = dynamic_cast<StyleElement *>(e) ) visit(*p) ;
+}
+
+void Visitor::visitChildren(Element *e)
+{
+    for( auto c: e->children_ ) visit(c.get()) ;
 }
 
 
