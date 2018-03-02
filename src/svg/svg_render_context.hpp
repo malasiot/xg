@@ -20,7 +20,11 @@ public:
       void pushTransform(const Transform &) ;
       void popTransform() ;
 
-      float toPixels(const Length &l, LengthDirection dir, bool scale_to_viewport) ;
+      void preRenderShape(const Style &s, const Transform &tr) ;
+      void postRenderShape() ;
+      void renderShape() ;
+
+      float toPixels(const Length &l, LengthDirection dir, bool scale_to_viewport = true) ;
 
       void extentBoundingBox(double x1, double x2, double y1, double y2) ;
 

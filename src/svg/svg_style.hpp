@@ -73,7 +73,6 @@ class Style
     void parseNameValue(const std::string &name, const std::string &val) ;
     void fromStyleString(const std::string &str) ;
 
-
     bool hasAttribute(StyleAttributeType f) const {
         return attributes_.find(f) != attributes_.end() ;
     }
@@ -112,12 +111,7 @@ private:
     std::map<StyleAttributeType, attribute_value_t> attributes_ ;
 
     void parsePaint(const std::string &str, Paint &p)  ;
-
-
 } ;
-
-
-
 
 } // namespace svg
 } //namespace xg

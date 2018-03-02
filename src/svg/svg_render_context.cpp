@@ -3,7 +3,7 @@
 namespace xg {
 namespace svg {
 
-float RenderingContext::toPixels(const Length &l, LengthDirection dir, bool scale_to_viewport = true) {
+float RenderingContext::toPixels(const Length &l, LengthDirection dir, bool scale_to_viewport) {
     double factor = 1.0 ;
 
     static const double default_font_size = 12.0 ;
@@ -114,122 +114,26 @@ void RenderingContext::pushState(const Style &st)
     //style.resetNonInheritable()
 
     style.extend(st) ;
-
-    /*
-    st.visit<StyleAttributeType::Fill>([&](){
-        style.setAttribute<Paint::Fill
-    }) ;
-
-    for( int i=0 ; i<st.flags_.size() ; i++ )
-    {
-        Style::Flag flag = st.flags_[i] ;
-
-        if ( flag == Style::FillState )
-        {
-            style.fill_paint_type_ = st.fill_paint_type_ ;
-            if ( style.fill_paint_type_ == Style::SolidColorPaint )
-              style.fill_paint_.clr_ = st.fill_paint_.clr_ ;
-            else if ( style.fill_paint_type_ == Style::PaintServerPaint )
-                style.fill_paint_.paint_server_id_ = strdup(st.fill_paint_.paint_server_id_) ;
-
-        }
-        else if ( flag == Style::FillOpacityState )
-        {
-            style.fill_opacity_ = st.fill_opacity_ ;
-        }
-        else if ( flag == Style::FillRuleState )
-        {
-            style.fill_rule_ = st.fill_rule_ ;
-        }
-        else if ( flag == Style::StrokeState )
-        {
-            style.stroke_paint_type_ = st.stroke_paint_type_ ;
-            if ( style.stroke_paint_type_ == Style::SolidColorPaint )
-              style.stroke_paint_.clr_ = st.stroke_paint_.clr_ ;
-            else if ( style.stroke_paint_type_ == Style::PaintServerPaint )
-                style.stroke_paint_.paint_server_id_ = strdup(st.stroke_paint_.paint_server_id_) ;
-
-        }
-        else if ( flag == Style::StrokeWidthState )
-        {
-            style.stroke_width_ = st.stroke_width_ ;
-        }
-        else if ( flag == Style::StrokeDashArrayState )
-        {
-            style.dash_array_ = st.dash_array_ ;
-            style.solid_stroke_ = st.solid_stroke_ ;
-        }
-        else if ( flag == Style::StrokeOpacityState )
-        {
-            style.stroke_opacity_ = st.stroke_opacity_ ;
-        }
-        else if ( flag == Style::OpacityState )
-        {
-            style.opacity_ = st.opacity_ ;
-        }
-        else if ( flag == Style::StrokeDashOffsetState )
-        {
-            style.dash_offset_ = st.dash_offset_ ;
-        }
-        else if ( flag == Style::StrokeLineCapState )
-        {
-            style.line_cap_ = st.line_cap_ ;
-        }
-        else if ( flag == Style::StrokeLineJoinState )
-        {
-            style.line_join_ = st.line_join_ ;
-        }
-        else if ( flag == Style::DisplayState )
-        {
-            style.display_mode_ = st.display_mode_ ;
-        }
-        else if ( flag == Style::VisibilityState )
-        {
-            style.visibility_mode_ = st.visibility_mode_ ;
-        }
-        else if ( flag == Style::FontFamilyState )
-        {
-            style.font_family_ = st.font_family_ ;
-        }
-        else if ( flag == Style::FontSizeState )
-        {
-            style.font_size_ = st.font_size_ ;
-        }
-        else if ( flag == Style::FontStyleState )
-        {
-            style.font_style_ = st.font_style_ ;
-        }
-        else if ( flag == Style::FontWeightState )
-        {
-            style.font_weight_ = st.font_weight_ ;
-        }
-        else if ( flag == Style::TextDecorationState )
-        {
-            style.text_decoration_ = st.text_decoration_ ;
-        }
-        else if ( flag == Style::TextAnchorState )
-        {
-            style.text_anchor_ = st.text_anchor_ ;
-        }
-        else if ( flag == Style::TextRenderingState )
-        {
-            style.text_rendering_quality_ = st.text_rendering_quality_ ;
-        }
-        else if ( flag == Style::ShapeRenderingState )
-        {
-            style.shape_rendering_quality_ = st.shape_rendering_quality_ ;
-        }
-        else if ( flag == Style::ClipPathState )
-        {
-            style.clip_path_id_ = st.clip_path_id_ ;
-        }
-    }
-    */
 }
 
 
 void RenderingContext::popState() {
     states_.pop_back() ;
+}
+
+void RenderingContext::preRenderShape(const Style &s, const Transform &tr)
+{
+
+}
+
+void RenderingContext::postRenderShape()
+{
+
+}
+
+void RenderingContext::renderShape()
+{
+
 }
 
 void RenderVisitor::visit(CircleElement &)
@@ -257,9 +161,44 @@ void RenderVisitor::visit(PathElement &)
 
 }
 
-void RenderVisitor::visit(RectElement &)
+void RenderVisitor::visit(RectElement &rect)
 {
+    ctx_.preRenderShape(rect.style_, rect.trans_) ;
 
+    double rxp = ctx_.toPixels(rect.rx_, LengthDirection::Horizontal) ;
+    double ryp = ctx_.toPixels(rect.ry_, LengthDirection::Vertical) ;
+    double xp = ctx_.toPixels(rect.x_, LengthDirection::Horizontal) ;
+    double yp = ctx_.toPixels(rect.y_, LengthDirection::Vertical) ;
+    double wp = ctx_.toPixels(rect.width_, LengthDirection::Horizontal) ;
+    double hp = ctx_.toPixels(rect.height_, LengthDirection::Vertical) ;
+
+    if (rxp > fabs (wp / 2.)) rxp = fabs (wp / 2.);
+    if (ryp > fabs (hp / 2.)) ryp = fabs (hp / 2.);
+
+    if (rxp == 0) rxp = ryp;
+    else if (ryp == 0) ryp = rxp ;
+
+    if ( wp != 0.0 && hp != 0.0 ) {
+        if ( rxp == 0.0 || ryp == 0.0 )
+            ctx_.canvas_.drawRect(xp, yp, wp, hp) ;
+        else {
+            Path rrect ;
+            rrect.moveTo(xp + rxp, yp) ;
+            rrect.lineTo(xp + wp - rxp, yp) ;
+            rrect.arcTo(rxp, ryp, M_PI/2.0, false, false, xp + wp, yp + ryp) ;
+            rrect.lineTo(xp + wp, yp + hp - ryp) ;
+            rrect.arcTo(rxp, ryp, M_PI/2.0, false, false, xp + wp -rxp, yp + hp) ;
+            rrect.lineTo(xp + rxp, yp + hp) ;
+            rrect.arcTo(rxp, ryp, M_PI/2.0, false, false, xp, yp + hp - ryp) ;
+            rrect.lineTo(xp, yp + ryp) ;
+            rrect.arcTo(rxp, ryp, M_PI/2.0, false, false, xp + rxp, yp) ;
+
+            ctx_.canvas_.drawPath(rrect) ;
+        }
+    }
+
+    ctx_.renderShape() ;
+    ctx_.postRenderShape() ;
 }
 
 void RenderVisitor::visit(EllipseElement &)
