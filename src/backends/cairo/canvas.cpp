@@ -48,25 +48,25 @@ void Backend::set_cairo_stroke(const Pen &pen) {
     cairo_set_miter_limit (cr, pen.miterLimit()) ;
 
     switch ( pen.lineCap() ) {
-    case LineCapButt:
+    case LineCap::Butt:
         cairo_set_line_cap(cr, CAIRO_LINE_CAP_BUTT) ;
         break ;
-    case LineCapRound:
+    case LineCap::Round:
         cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND) ;
         break ;
-    case LineCapSquare:
+    case LineCap::Square:
         cairo_set_line_cap(cr, CAIRO_LINE_CAP_SQUARE) ;
         break ;
     }
 
     switch ( pen.lineJoin() ) {
-    case LineJoinMiter:
+    case LineJoin::Miter:
         cairo_set_line_join(cr, CAIRO_LINE_JOIN_MITER) ;
         break ;
-    case LineJoinRound:
+    case LineJoin::Round:
         cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND) ;
         break ;
-    case LineJoinBevel:
+    case LineJoin::Bevel:
         cairo_set_line_join(cr, CAIRO_LINE_JOIN_BEVEL) ;
         break ;
     }

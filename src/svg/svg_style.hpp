@@ -61,6 +61,8 @@ struct FontSize {
 };
 
 struct Paint {
+    Paint(): type_(PaintType::None) {}
+
     PaintType type_ ;
 
     Variant<CSSColor, std::string> clr_or_server_id_ ;
@@ -70,19 +72,30 @@ class Style
 {
   public:
 
+    using dash_array_t = std::vector<Length> ;
+
+    FillRule getfillRule() const { return findAttribute<FillRule>(StyleAttributeType::FillRule, FillRule::NonZero) ;  }
+    std::string getClipPath() const { return findAttribute<std::string>(StyleAttributeType::ClipPath, std::string()) ; }
+    ShapeQuality getShapeQuality() const { return findAttribute<ShapeQuality>(StyleAttributeType::ShapeRendering, ShapeQuality::Auto) ;}
+    Length getStrokeWidth() const { return findAttribute<Length>(StyleAttributeType::StrokeWidth, 1.0) ;}
+    float getMiterLimit() const { return findAttribute<float>(StyleAttributeType::StrokeMiterLimit, 1.0) ;}
+    LineCapType getLineCap() const { return findAttribute<LineCapType>(StyleAttributeType::StrokeLineCap, LineCapType::Round) ;}
+    LineJoinType getLineJoin() const { return findAttribute<LineJoinType>(StyleAttributeType::StrokeLineJoin, LineJoinType::Round) ;}
+
+    dash_array_t getDashArray() const { return findAttribute<dash_array_t>(StyleAttributeType::StrokeDashArray, dash_array_t()) ; }
+    Length getDashOffset() const { return findAttribute<Length>(StyleAttributeType::StrokeDashOffset, 0.0) ; }
+
+    Paint getFillPaint() const { return findAttribute<Paint>(StyleAttributeType::Fill, Paint()) ; }
+    Paint getStrokePaint() const { return findAttribute<Paint>(StyleAttributeType::Stroke, Paint()) ; }
+    float getFillOpacity() const { return findAttribute<float>(StyleAttributeType::FillOpacity, 1.0) ; }
+    float getOpacity() const { return findAttribute<float>(StyleAttributeType::Opacity, 1.0) ; }
+
+
     void parseNameValue(const std::string &name, const std::string &val) ;
     void fromStyleString(const std::string &str) ;
 
     bool hasAttribute(StyleAttributeType f) const {
         return attributes_.find(f) != attributes_.end() ;
-    }
-
-    FillRule fillRule() const {
-        return findAttribute<FillRule>(StyleAttributeType::FillRule, FillRule::NonZero) ;
-    }
-
-    std::string getClipPath() const {
-        return findAttribute<std::string>(StyleAttributeType::ClipPath, std::string()) ;
     }
 
 
@@ -108,7 +121,7 @@ class Style
 
 private:
 
-    using dash_array_t = std::vector<Length> ;
+
     using attribute_value_t = Variant<float, std::string, Length, CSSColor, Paint, dash_array_t, FillRule, LineJoinType, LineCapType,  FontStyle,
         FontVariant, FontWeight, FontStretch, FontSize, TextDecoration, TextAnchor,
         ShapeQuality, TextQuality, DisplayMode, VisibilityMode, OverflowType>;

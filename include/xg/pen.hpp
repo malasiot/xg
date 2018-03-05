@@ -7,8 +7,8 @@
 namespace xg {
 
 
-enum LineJoin { LineJoinMiter, LineJoinRound, LineJoinBevel } ;
-enum LineCap { LineCapButt, LineCapRound, LineCapSquare } ;
+enum class LineJoin { Miter, Round, Bevel } ;
+enum class LineCap { Butt, Round, Square } ;
 enum LineStyle { SolidLine, DashLine, DotLine, DashDotLine, CustomDashLine } ;
 
 class PenBase {
@@ -49,8 +49,8 @@ private:
     Type type() const override { return PenBase::Cosmetic ; }
 
     double line_width_, miter_limit_ = 0 ;
-    LineJoin line_join_ = LineJoinRound ;
-    LineCap line_cap_ = LineCapRound ;
+    LineJoin line_join_ = LineJoin::Round ;
+    LineCap line_cap_ = LineCap::Round ;
     LineStyle line_style_ = SolidLine ;
     std::vector<double> dash_array_ ;
     double dash_offset_ = 0;

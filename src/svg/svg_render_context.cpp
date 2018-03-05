@@ -55,32 +55,32 @@ float RenderingContext::toPixels(const Length &l, LengthDirection dir, bool scal
     return 0 ;
 }
 
-void RenderVisitor::visit(SVGElement &e) {
-    ctx_.pushState(e.style_) ;
+void RenderingContext::render(SVGElement &e) {
+    pushState(e.style_) ;
 
     float xx, yy, sw, sh ;
 
     if ( e.x_.unknown() ) xx = 0 ;
-    else xx = ctx_.toPixels(e.x_, LengthDirection::Horizontal) ;
+    else xx = toPixels(e.x_, LengthDirection::Horizontal) ;
 
     if ( e.y_.unknown() ) yy = 0 ;
-    else yy = ctx_.toPixels(e.y_, LengthDirection::Vertical) ;
+    else yy = toPixels(e.y_, LengthDirection::Vertical) ;
 
     if ( e.width_.unknown() ) {
         if ( e.parent_ )
-            sw = ctx_.toPixels(1.0_perc, LengthDirection::Horizontal) ;
-        else sw = ctx_.doc_width_hint_ ;
+            sw = toPixels(1.0_perc, LengthDirection::Horizontal) ;
+        else sw = doc_width_hint_ ;
     }
     else
-        sw = ctx_.toPixels(e.width_, LengthDirection::Horizontal) ;
+        sw = toPixels(e.width_, LengthDirection::Horizontal) ;
 
     if ( e.height_.unknown() ) {
         if ( e.parent_ )
-            sh = ctx_.toPixels(1.0_perc, LengthDirection::Vertical) ;
-        else sh = ctx_.doc_height_hint_ ;
+            sh = toPixels(1.0_perc, LengthDirection::Vertical) ;
+        else sh = doc_height_hint_ ;
     }
     else
-       sh = ctx_.toPixels(e.height_, LengthDirection::Horizontal) ;
+        sh = toPixels(e.height_, LengthDirection::Horizontal) ;
 
 
     ViewBox vbox = e.view_box_ ;
@@ -88,20 +88,20 @@ void RenderVisitor::visit(SVGElement &e) {
     if ( vbox.width_ == 0 ) vbox.width_ = sw ;
     if ( vbox.height_ == 0 ) vbox.height_ = sh ;
 
-    ctx_.view_boxes_.push_back(vbox) ;
+    view_boxes_.push_back(vbox) ;
 
     Matrix2d trs = e.preserve_aspect_ratio_.getViewBoxTransform(sw, sh, vbox.width_, vbox.height_, vbox.x_, vbox.y_) ;
 
-    ctx_.view2dev_ = trs ;
+    view2dev_ = trs ;
 
-    ctx_.canvas_.save() ;
-    ctx_.canvas_.setTransform(trs) ;
+    canvas_.save() ;
+    canvas_.setTransform(trs) ;
 
-    visitChildren(&e);
+    renderChildren(&e);
 
-    ctx_.canvas_.restore() ;
-    ctx_.popState();
-    ctx_.view_boxes_.pop_back();
+    canvas_.restore() ;
+    popState();
+    view_boxes_.pop_back();
 }
 
 
@@ -138,58 +138,16 @@ ElementPtr RenderingContext::lookupRef(const std::string &name) {
     else return (*it).second ;
 }
 
-void RenderingContext::populateRefs(const ElementPtr &root) {
-    if ( root->getType() == Element::DocumentElement )
-    {
-        Document *pElem = dynamic_cast<Document *>(root.get()) ;
+void RenderingContext::populateRefs(const ElementPtr &p) {
 
-        for( int i=0 ; i<pElem->children_.size() ; i++ )
-        {
-            ElementPtr el = pElem->children_[i] ;
+    for( const auto el: p->children_ ) {
+        string id = el->id_ ;
 
-            string id = el->id_ ;
+        if ( !id.empty() ) refs_['#' + id] = el ;
 
-            if ( !id.empty() ) refs_['#' + id] = el ;
-
-            if ( el->getType() == Element::DocumentElement ||
-                 el->getType() == Element::GroupElement ||
-                 el->getType() == Element::DefsElement ) populateRefs(el) ;
-        }
+        populateRefs(el) ;
     }
-    else if ( root->getType() == Element::GroupElement )
-    {
-        Group *pElem = dynamic_cast<Group *>(root.get()) ;
 
-        for( int i=0 ; i<pElem->children_.size() ; i++ )
-        {
-            ElementPtr el = pElem->children_[i] ;
-
-            string id = el->id_ ;
-
-            if ( !id.empty() ) refs_['#' + id] = el ;
-
-            if ( el->getType() == Element::DocumentElement ||
-                 el->getType() == Element::GroupElement ||
-                 el->getType() == Element::DefsElement ) populateRefs(el) ;
-        }
-    }
-    else if ( root->getType() == Element::DefsElement )
-    {
-        Defs *pElem = dynamic_cast<Defs *>(root.get()) ;
-
-        for( int i=0 ; i<pElem->children_.size() ; i++ )
-        {
-            ElementPtr el = pElem->children_[i] ;
-
-            string id = el->id_ ;
-
-            if ( !id.empty() ) refs_['#' + id] = el ;
-
-            if ( el->getType() == Element::DocumentElement ||
-                 el->getType() == Element::GroupElement ||
-                 el->getType() == Element::DefsElement ) populateRefs(el) ;
-        }
-    }
 }
 
 void RenderingContext::preRenderShape(const Style &s, const Matrix2d &t)
@@ -205,13 +163,107 @@ void RenderingContext::preRenderShape(const Style &s, const Matrix2d &t)
     if ( rendering_mode_ == RenderingMode::Display ) {
         string cp_id = st.getClipPath() ;
         if ( !cp_id.empty() ) {
-          ElementPtr p = lookupRef(cp_id) ;
+            ElementPtr p = lookupRef(cp_id) ;
 
-          if ( p ) {
-              auto e = std::dynamic_pointer_cast<ClipPathElement>(p) ;
-          }
-      }
+            if ( p ) {
+                auto e = std::dynamic_pointer_cast<ClipPathElement>(p) ;
+                if ( e ) applyClipPath(e.get()) ;
+            }
+        }
     }
+}
+
+void RenderingContext::setShapeAntialias (ShapeQuality aa) {
+    switch ( aa ) {
+    case ShapeQuality::Auto:
+    case ShapeQuality::CrispEdges:
+    case ShapeQuality::GeometricPrecision:
+        canvas_.setAntialias(true);
+    case ShapeQuality::OptimizeSpeed:
+        canvas_.setAntialias(false);
+    }
+}
+
+void RenderingContext::renderShape()
+{
+    Style &st = states_.back() ;
+
+    setShapeAntialias(st.getShapeQuality()) ;
+
+    /*
+      double x1, y1, x2, y2 ;
+      cairo_path_extents(cr, &x1, &y1, &x2, &y2) ;
+
+      ctx->extentBoundingBox(x1, y1, x2, y2) ;
+*/
+
+    Pen pen ;
+    pen.setLineWidth(toPixels(st.getStrokeWidth(), LengthDirection::Absolute)) ;
+    pen.setMiterLimit(st.getMiterLimit()) ;
+
+    switch ( st.getLineCap() ) {
+    case LineCapType::Butt:
+        pen.setLineCap(LineCap::Butt)  ;
+        break ;
+    case LineCapType::Round:
+        pen.setLineCap(LineCap::Round)  ;
+        break ;
+    case LineCapType::Square:
+        pen.setLineCap(LineCap::Square)  ;
+        break ;
+    }
+
+    switch ( st.getLineJoin() ) {
+    case LineJoinType::Bevel:
+        pen.setLineJoin(LineJoin::Bevel)  ;
+        break ;
+    case LineJoinType::Round:
+        pen.setLineJoin(LineJoin::Round)  ;
+        break ;
+    case LineJoinType::Miter:
+        pen.setLineJoin(LineJoin::Miter)  ;
+        break ;
+    }
+
+    std::vector<Length> dash_array = st.getDashArray() ;
+
+    if ( !dash_array.empty() ) {
+        vector<double> dashes ;
+        dashes.reserve(dash_array.size()) ;
+        for( const auto &l: dash_array ) {
+            dashes.emplace_back(toPixels(l, LengthDirection::Absolute)) ;
+        }
+
+        pen.setDashArray(dashes) ;
+        pen.setDashOffset(toPixels(st.getDashOffset(), LengthDirection::Absolute)) ;
+    }
+
+    Paint fill_paint = st.getFillPaint() ;
+
+    if ( fill_paint.type_ == PaintType::None ) ;
+    else if ( fill_paint.type_ == PaintType::SolidColor ) {
+        float fill_opacity = st.getFillOpacity() ;
+        float opacity = st.getOpacity() ;
+        Color clr(fill_paint.clr_or_server_id_.get<CSSColor>(), fill_opacity * opacity) ;
+
+        canvas_.setBrush(SolidBrush(clr)) ;
+    }
+    else if ( fill_paint.type_ == PaintType::PaintServer ) {
+        ElementPtr elem = lookupRef(fill_paint.clr_or_server_id_.get<std::string>()) ;
+
+        if ( elem ) {
+            /*
+                if ( elem->getType() == Element::LinearGradientElement )
+                    cairo_apply_linear_gradient(ctx, dynamic_cast<LinearGradient *>(elem.get()), st.fill_opacity_/255.0) ;
+                else if ( elem->getType() == Element::RadialGradientElement )
+                    cairo_apply_radial_gradient(ctx, dynamic_cast<RadialGradient *>(elem.get()), st.fill_opacity_/255.0) ;
+                else if ( elem->getType() == Element::PatternElement)
+                    cairo_apply_pattern(ctx, dynamic_cast<Pattern *>(elem.get()), st.fill_opacity_/255.0) ;
+            }
+            */
+        }
+    }
+
 }
 
 void RenderingContext::postRenderShape()
@@ -219,46 +271,46 @@ void RenderingContext::postRenderShape()
 
 }
 
-void RenderingContext::renderShape()
+void RenderingContext::applyClipPath(ClipPathElement *e)
 {
 
 }
 
-void RenderVisitor::visit(CircleElement &)
+void RenderingContext::render(CircleElement &)
 {
 
 }
 
-void RenderVisitor::visit(LineElement &)
+void RenderingContext::render(LineElement &)
 {
 
 }
 
-void RenderVisitor::visit(PolygonElement &)
+void RenderingContext::render(PolygonElement &)
 {
 
 }
 
-void RenderVisitor::visit(PolylineElement &)
+void RenderingContext::render(PolylineElement &)
 {
 
 }
 
-void RenderVisitor::visit(PathElement &)
+void RenderingContext::render(PathElement &)
 {
 
 }
 
-void RenderVisitor::visit(RectElement &rect)
+void RenderingContext::render(RectElement &rect)
 {
-    ctx_.preRenderShape(rect.style_, rect.trans_.m_) ;
+    preRenderShape(rect.style_, rect.trans_.m_) ;
 
-    double rxp = ctx_.toPixels(rect.rx_, LengthDirection::Horizontal) ;
-    double ryp = ctx_.toPixels(rect.ry_, LengthDirection::Vertical) ;
-    double xp = ctx_.toPixels(rect.x_, LengthDirection::Horizontal) ;
-    double yp = ctx_.toPixels(rect.y_, LengthDirection::Vertical) ;
-    double wp = ctx_.toPixels(rect.width_, LengthDirection::Horizontal) ;
-    double hp = ctx_.toPixels(rect.height_, LengthDirection::Vertical) ;
+    double rxp = toPixels(rect.rx_, LengthDirection::Horizontal) ;
+    double ryp = toPixels(rect.ry_, LengthDirection::Vertical) ;
+    double xp = toPixels(rect.x_, LengthDirection::Horizontal) ;
+    double yp = toPixels(rect.y_, LengthDirection::Vertical) ;
+    double wp = toPixels(rect.width_, LengthDirection::Horizontal) ;
+    double hp = toPixels(rect.height_, LengthDirection::Vertical) ;
 
     if (rxp > fabs (wp / 2.)) rxp = fabs (wp / 2.);
     if (ryp > fabs (hp / 2.)) ryp = fabs (hp / 2.);
@@ -266,93 +318,67 @@ void RenderVisitor::visit(RectElement &rect)
     if (rxp == 0) rxp = ryp;
     else if (ryp == 0) ryp = rxp ;
 
-    if ( wp != 0.0 && hp != 0.0 ) {
-        if ( rxp == 0.0 || ryp == 0.0 )
-            ctx_.canvas_.drawRect(xp, yp, wp, hp) ;
-        else {
-            Path rrect ;
-            rrect.moveTo(xp + rxp, yp) ;
-            rrect.lineTo(xp + wp - rxp, yp) ;
-            rrect.arcTo(rxp, ryp, M_PI/2.0, false, false, xp + wp, yp + ryp) ;
-            rrect.lineTo(xp + wp, yp + hp - ryp) ;
-            rrect.arcTo(rxp, ryp, M_PI/2.0, false, false, xp + wp -rxp, yp + hp) ;
-            rrect.lineTo(xp + rxp, yp + hp) ;
-            rrect.arcTo(rxp, ryp, M_PI/2.0, false, false, xp, yp + hp - ryp) ;
-            rrect.lineTo(xp, yp + ryp) ;
-            rrect.arcTo(rxp, ryp, M_PI/2.0, false, false, xp + rxp, yp) ;
+    canvas_.drawPath(Path().addRoundedRect(xp, yp, wp, hp, rxp, ryp)) ;
 
-            ctx_.canvas_.drawPath(rrect) ;
-        }
+    renderShape() ;
+
+    postRenderShape() ;
+}
+
+void RenderingContext::render(EllipseElement &)
+{
+
+}
+
+void RenderingContext::render(ImageElement &)
+{
+
+}
+
+void RenderingContext::render(TextElement &)
+{
+
+}
+
+void RenderingContext::render(TextSpanElement &)
+{
+
+}
+
+void RenderingContext::renderChildren(const Element *e)
+{
+    for( const auto c: e->children_ ) {
+        if ( auto p = std::dynamic_pointer_cast<SVGElement>(c) ) render(*p) ;
+        else if ( auto p = std::dynamic_pointer_cast<RectElement>(c) ) render(*p) ;
+        else if ( auto p = std::dynamic_pointer_cast<PathElement>(c) ) render(*p) ;
+        else if ( auto p = std::dynamic_pointer_cast<PolygonElement>(c) ) render(*p) ;
+        else if ( auto p = std::dynamic_pointer_cast<PolylineElement>(c) ) render(*p) ;
+        else if ( auto p = std::dynamic_pointer_cast<CircleElement>(c) ) render(*p) ;
+        else if ( auto p = std::dynamic_pointer_cast<EllipseElement>(c) ) render(*p) ;
+        else if ( auto p = std::dynamic_pointer_cast<GroupElement>(c) ) render(*p) ;
+        else if ( auto p = std::dynamic_pointer_cast<SymbolElement>(c) ) render(*p) ;
+        else if ( auto p = std::dynamic_pointer_cast<UseElement>(c) ) render(*p) ;
+        else if ( auto p = std::dynamic_pointer_cast<ImageElement>(c) ) render(*p) ;
+        else if ( auto p = std::dynamic_pointer_cast<TextElement>(c) ) render(*p) ;
+        else if ( auto p = std::dynamic_pointer_cast<TextSpanElement>(c) ) render(*p) ;
     }
-
-    ctx_.renderShape() ;
-    ctx_.postRenderShape() ;
 }
 
-void RenderVisitor::visit(EllipseElement &)
+void RenderingContext::render(SymbolElement &)
 {
 
 }
 
-void RenderVisitor::visit(DefsElement &)
+void RenderingContext::render(GroupElement &)
 {
 
 }
 
-void RenderVisitor::visit(GroupElement &)
+void RenderingContext::render(UseElement &)
 {
 
 }
 
-void RenderVisitor::visit(SymbolElement &)
-{
-
-}
-
-void RenderVisitor::visit(UseElement &)
-{
-
-}
-
-void RenderVisitor::visit(ClipPathElement &)
-{
-
-}
-
-void RenderVisitor::visit(ImageElement &)
-{
-
-}
-
-void RenderVisitor::visit(TextElement &)
-{
-
-}
-
-void RenderVisitor::visit(LinearGradientElement &)
-{
-
-}
-
-void RenderVisitor::visit(RadialGradientElement &)
-{
-
-}
-
-void RenderVisitor::visit(PatternElement &)
-{
-
-}
-
-void RenderVisitor::visit(TextSpanElement &)
-{
-
-}
-
-void RenderVisitor::visit(StyleElement &)
-{
-
-}
 
 
 

@@ -21,8 +21,10 @@ public:
       void popTransform() ;
 
       void preRenderShape(const Style &s, const Matrix2d &tr) ;
-      void postRenderShape() ;
       void renderShape() ;
+      void postRenderShape() ;
+
+      void applyClipPath(ClipPathElement *e) ;
 
       float toPixels(const Length &l, LengthDirection dir, bool scale_to_viewport = true) ;
 
@@ -34,6 +36,32 @@ public:
       void setFilePath(const std::string &path) {
           file_path_ = path ;
       }
+
+      void render(SVGElement &)  ;
+      void render(CircleElement &) ;
+      void render(LineElement &) ;
+      void render(PolygonElement &) ;
+      void render(PolylineElement &) ;
+      void render(PathElement &) ;
+      void render(RectElement &) ;
+      void render(EllipseElement &) ;
+      //void visit(DefsElement &) override ;
+      void render(GroupElement &) ;
+      void render(SymbolElement &) ;
+      void render(UseElement &) ;
+     // void visit(ClipPathElement &) override ;
+      void render(ImageElement &) ;
+      void render(TextElement &) ;
+      //void render(LinearGradientElement &) ;
+      //void visit(RadialGradientElement &) override ;
+      //void visit(PatternElement &) override ;
+      void render(TextSpanElement &) ;
+      //void visit(StyleElement &) override ;
+
+      void renderChildren(const Element *e) ;
+
+      void setShapeAntialias(ShapeQuality aa);
+protected:
 
       Canvas &canvas_ ;
       std::deque<Style> states_ ;
@@ -52,34 +80,6 @@ public:
 
 };
 
-class RenderVisitor: public Visitor {
-public:
-    RenderVisitor(RenderingContext &ctx): ctx_(ctx) {}
-
-    void visit(SVGElement &) override ;
-    void visit(CircleElement &) override ;
-    void visit(LineElement &) override ;
-    void visit(PolygonElement &) override ;
-    void visit(PolylineElement &) override ;
-    void visit(PathElement &) override ;
-    void visit(RectElement &) override ;
-    void visit(EllipseElement &) override ;
-    void visit(DefsElement &) override ;
-    void visit(GroupElement &) override ;
-    void visit(SymbolElement &) override ;
-    void visit(UseElement &) override ;
-    void visit(ClipPathElement &) override ;
-    void visit(ImageElement &) override ;
-    void visit(TextElement &) override ;
-    void visit(LinearGradientElement &) override ;
-    void visit(RadialGradientElement &) override ;
-    void visit(PatternElement &) override ;
-    void visit(TextSpanElement &) override ;
-    void visit(StyleElement &) override ;
-
-    RenderingContext &ctx_ ;
-
-};
 
 }
 }
