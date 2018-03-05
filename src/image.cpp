@@ -151,6 +151,4 @@ Image::Image(unsigned int width, unsigned int height, ImageFormat fmt): width_(w
 }
 
 
-
-
 }

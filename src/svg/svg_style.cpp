@@ -68,15 +68,15 @@ void Style::parseNameValue(const string &name, const string &value) {
     }
     else if ( name == "clip-rule" ) ;
     else if ( name == "fill") {
-        Paint p ;
+        FillPaint p ;
         parsePaint(val, p) ;
-        setAttribute<Paint>(StyleAttributeType::Fill, p) ;
+        setAttribute<FillPaint>(StyleAttributeType::Fill, p) ;
     }
     else if ( name == "stroke" )
     {
-        Paint p ;
+        StrokePaint p ;
         parsePaint(val, p) ;
-        setAttribute<Paint>(StyleAttributeType::Stroke, p) ;
+        setAttribute<StrokePaint>(StyleAttributeType::Stroke, p) ;
     }
     else if ( name == "stroke-width" ) {
         Length sw = Length::fromString(val) ;

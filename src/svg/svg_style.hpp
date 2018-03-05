@@ -61,11 +61,22 @@ struct FontSize {
 };
 
 struct Paint {
-    Paint(): type_(PaintType::None) {}
+    Paint(PaintType t): type_(t) {}
 
     PaintType type_ ;
 
     Variant<CSSColor, std::string> clr_or_server_id_ ;
+} ;
+
+struct FillPaint: public Paint {
+    FillPaint(): Paint(PaintType::SolidColor) {
+        clr_or_server_id_.set<CSSColor>(0, 0, 0) ;
+    }
+} ;
+
+struct StrokePaint: public Paint {
+    StrokePaint(): Paint(PaintType::None) {
+    }
 } ;
 
 class Style
@@ -85,8 +96,8 @@ class Style
     dash_array_t getDashArray() const { return findAttribute<dash_array_t>(StyleAttributeType::StrokeDashArray, dash_array_t()) ; }
     Length getDashOffset() const { return findAttribute<Length>(StyleAttributeType::StrokeDashOffset, 0.0) ; }
 
-    Paint getFillPaint() const { return findAttribute<Paint>(StyleAttributeType::Fill, Paint()) ; }
-    Paint getStrokePaint() const { return findAttribute<Paint>(StyleAttributeType::Stroke, Paint()) ; }
+    FillPaint getFillPaint() const { return findAttribute<FillPaint>(StyleAttributeType::Fill, FillPaint()) ; }
+    StrokePaint getStrokePaint() const { return findAttribute<StrokePaint>(StyleAttributeType::Stroke, StrokePaint()) ; }
     float getFillOpacity() const { return findAttribute<float>(StyleAttributeType::FillOpacity, 1.0) ; }
     float getOpacity() const { return findAttribute<float>(StyleAttributeType::Opacity, 1.0) ; }
 
@@ -122,7 +133,7 @@ class Style
 private:
 
 
-    using attribute_value_t = Variant<float, std::string, Length, CSSColor, Paint, dash_array_t, FillRule, LineJoinType, LineCapType,  FontStyle,
+    using attribute_value_t = Variant<float, std::string, Length, CSSColor, FillPaint, StrokePaint, dash_array_t, FillRule, LineJoinType, LineCapType,  FontStyle,
         FontVariant, FontWeight, FontStretch, FontSize, TextDecoration, TextAnchor,
         ShapeQuality, TextQuality, DisplayMode, VisibilityMode, OverflowType>;
 

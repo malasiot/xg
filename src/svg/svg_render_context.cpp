@@ -161,8 +161,10 @@ void RenderingContext::setShapeAntialias (ShapeQuality aa) {
     case ShapeQuality::CrispEdges:
     case ShapeQuality::GeometricPrecision:
         canvas_.setAntialias(true);
+        break ;
     case ShapeQuality::OptimizeSpeed:
         canvas_.setAntialias(false);
+        break ;
     }
 }
 
@@ -249,7 +251,7 @@ void RenderingContext::setPaint()
         float fill_opacity = st.getFillOpacity() ;
         float opacity = st.getOpacity() ;
         const CSSColor &css_clr = fill_paint.clr_or_server_id_.get<CSSColor>() ;
-        Color clr(css_clr, 1 /*fill_opacity * opacity*/) ;
+        Color clr(css_clr, fill_opacity * opacity) ;
 
         canvas_.setBrush(SolidBrush(clr)) ;
     }
@@ -378,8 +380,10 @@ void RenderingContext::render(SymbolElement &)
 
 }
 
-void RenderingContext::render(GroupElement &)
-{
+void RenderingContext::render(GroupElement &g) {
+     preRenderShape(g.style_, g.trans_.m_) ;
+     renderChildren(&g) ;
+     postRenderShape() ;
 
 }
 
