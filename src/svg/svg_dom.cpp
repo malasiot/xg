@@ -125,6 +125,7 @@ void PreserveAspectRatio::constrainViewBox(double width, double height, ViewBox 
     orig.width_ = origw ;
     orig.height_ = origh ;
 }
+
 Matrix2d PreserveAspectRatio::getViewBoxTransform(double sw, double sh, double vwidth, double vheight, double vx, double vy)
 {
     Matrix2d trs ;
@@ -166,6 +167,8 @@ Matrix2d PreserveAspectRatio::getViewBoxTransform(double sw, double sh, double v
         trs.scale(aspScaleX, aspScaleY) ;
         trs.translate(ofx, ofy) ;
     }
+
+    return trs ;
 
 }
 

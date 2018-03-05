@@ -12,6 +12,7 @@
 #include <xg/font.hpp>
 #include <xg/image.hpp>
 #include <xg/rectangle.hpp>
+#include <xg/svg_document.hpp>
 
 #include <xg/backends/cairo/canvas.hpp>
 
@@ -22,15 +23,18 @@ enum TextAlignFlags {
 }  ;
 
 class Canvas: public detail::Backend {
-public:
+protected:
 
-    Canvas(double width, double height) ;
+    Canvas(double width, double height, double dpix, double dpiy) ;
 
     Canvas(Canvas &&op) noexcept = default ;
     Canvas& operator=(Canvas&& op) noexcept = default ;
 
+public:
+
     void save() ;
     void restore() ;
+
 
     void setTransform(const Matrix2d &tr) ;
 
@@ -67,8 +71,16 @@ public:
 
     void drawImage(const Image &im, double x0, double y0, double width, double height, double opacity) ;
 
+    void drawSVG(const SVGDocument &doc) ;
+
+    double width() const { return width_ ;  }
+    double height() const { return height_ ;  }
+    double dpiX() const { return dpi_x_ ; }
+    double dpiY() const { return dpi_y_ ; }
+
 protected:
     double width_, height_ ;
+    double dpi_x_, dpi_y_ ;
 } ;
 
 class ImageCanvas: public Canvas

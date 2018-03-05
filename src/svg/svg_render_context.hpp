@@ -13,7 +13,9 @@ class RenderingContext {
 
 public:
 
-      RenderingContext(Canvas &canvas): canvas_(canvas), rendering_mode_(RenderingMode::Display) {}
+      RenderingContext(Canvas &canvas): canvas_(canvas), rendering_mode_(RenderingMode::Display) {
+          view_boxes_.push_back({0, 0, (float)canvas.width(), (float)canvas.height()}) ;
+      }
 
       void pushState(const Style &) ;
       void popState() ;
@@ -21,7 +23,7 @@ public:
       void popTransform() ;
 
       void preRenderShape(const Style &s, const Matrix2d &tr) ;
-      void renderShape() ;
+      void setPaint() ;
       void postRenderShape() ;
 
       void applyClipPath(ClipPathElement *e) ;
@@ -61,6 +63,9 @@ public:
       void renderChildren(const Element *e) ;
 
       void setShapeAntialias(ShapeQuality aa);
+      void setLinearGradientBrush(LinearGradientElement &e, float a) ;
+      void setRadialGradientBrush(RadialGradientElement &e, float a) ;
+      void setPatternBrush(PatternElement &e, float a) ;
 protected:
 
       Canvas &canvas_ ;

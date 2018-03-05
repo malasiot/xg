@@ -19,7 +19,7 @@ bool parse_number(const std::string &s, float &val) {
 
     return true ;
 }
-
+/*
 bool parse_coordinate_list(const std::string &p, vector<float> &args)
 {
     auto tokens = split(p, ", ") ;
@@ -33,6 +33,31 @@ bool parse_coordinate_list(const std::string &p, vector<float> &args)
 
     return true ;
 }
+*/
+
+bool parse_coordinate_list(const std::string &s, vector<float> &args)
+{
+    const char *c_start = s.c_str() ;
+    char *c_end ;
+
+    while (1) {
+        float val = strtof(c_start, &c_end) ;
+
+        if ( c_end == c_start )  return false ;
+        if ((val == -HUGE_VAL || val == HUGE_VAL) && (ERANGE == errno)) return false ;
+
+        args.push_back(val) ;
+
+        c_start = c_end ;
+
+        while ( *c_start == ' ' || *c_start == ',' ) ++c_start ;
+
+        if ( *c_start == 0 ) break ;
+    }
+
+    return true ;
+}
+
 
 bool parse_coordinate_list(const std::string &p, float &arg1, float &arg2)
 {

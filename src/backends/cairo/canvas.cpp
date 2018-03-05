@@ -258,6 +258,7 @@ void Backend::set_cairo_fill(const std::shared_ptr<Brush> &br) {
     if ( const auto &brush = dynamic_cast<SolidBrush *>(br.get()) )
     {
         const Color &clr = brush->color() ;
+
         if ( clr.a() * br->fillOpacity()  == 1.0 ) cairo_set_source_rgb(cr_, clr.r(), clr.g(), clr.b()) ;
         else cairo_set_source_rgba(cr_, clr.r(), clr.g(), clr.b(), clr.a() * br->fillOpacity() ) ;
     }
@@ -808,10 +809,10 @@ void Canvas::drawEllipse(double xp, double yp, double rxp, double ryp) {
     fill_stroke_shape() ;
 }
 
-Canvas::Canvas(double width, double height): width_(width), height_(height) {
+Canvas::Canvas(double width, double height, double dpix, double dpiy): width_(width), height_(height), dpi_x_(dpix), dpi_y_(dpiy) {
 }
 
-ImageCanvas::ImageCanvas(double w, double h, double dpi): Canvas(w, h), dpi_(dpi) {
+ImageCanvas::ImageCanvas(double w, double h, double dpi): Canvas(w, h, dpi, dpi) {
     surf_ = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h) ;
     cr_ = cairo_create(surf_) ;
 }
@@ -823,6 +824,7 @@ Image ImageCanvas::getImage()
     unsigned width = cairo_image_surface_get_width(surf_) ;
     unsigned height = cairo_image_surface_get_height(surf_) ;
     unsigned src_stride = cairo_image_surface_get_stride(surf_) ;
+    cairo_format_t src_format = cairo_image_surface_get_format(surf_) ;
 
     Image im(width, height, ImageFormat::ARGB32) ;
 
@@ -831,10 +833,17 @@ Image ImageCanvas::getImage()
     dst = im.pixels() ;
     uint i, j ;
 
-    for( i=0 ; i<height ; i++, dst += dst_stride, src += src_stride ) {
-        for( j=0, p=src, q=dst ; j<width ; j++ ) {
-            char a = *p++, r = *p++, g = *p++, b = *p++ ;
-            *q++ = a ; *q++ = r ; *q++ = g ; *q++ = b ;
+    if ( src_format == CAIRO_FORMAT_ARGB32 ) {
+        for( i=0 ; i<height ; i++, dst += dst_stride, src += src_stride ) {
+            for( j=0, p=src, q=dst ; j<width ; j++ ) {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+                char a = *p++, r = *p++, g = *p++, b = *p++ ;
+#else
+
+                char b = *p++, g = *p++, r = *p++, a = *p++ ;
+#endif
+                *q++ = a ; *q++ = r ; *q++ = g ; *q++ = b ;
+            }
         }
     }
 
@@ -870,6 +879,7 @@ void Canvas::drawImage(const Image &im, double x0, double y0, double w, double h
 
 
 }
+
 
 /*
 Backend &Backend::drawImage(const std::string &pngImageFile, double x0, double y0, double w, double h, ViewBoxPolicy policy, ViewBoxAlign align,

@@ -91,14 +91,28 @@ bool Image::png_write(W &writer) {
     char *p = (char *)pixels_.get() ;
 
     for (int row = 0; row < height_; row++, p += stride_ ) {
-        row_pointers[row] = (png_bytep)p ;
+        if ( format_ == ImageFormat::ARGB32 ) {
+            png_bytep data = new png_byte [width_ * 4], dst = data ;
+            unsigned char *src = (unsigned char *)p ;
+            for( int col = 0 ; col < width_ ; col++, src += 4 ) {
+                *dst++ = src[2] ;
+                *dst++ = src[1] ;
+                *dst++ = src[0] ;
+                *dst++ = src[3] ;
+            }
+
+            row_pointers[row] = (png_bytep)data ;
+        }
     }
 
     png_write_image((png_structp)png_ptr, row_pointers);
     /* It is REQUIRED to call this to finish writing the rest of the file */
     png_write_end((png_structp)png_ptr, (png_infop)info_ptr);
 
-    delete row_pointers ;
+    for (int row = 0; row < height_; row++)
+        delete [] row_pointers[row] ;
+
+    delete [] row_pointers ;
 
     /* clean up after the write, and free any memory allocated */
     png_destroy_write_struct((png_structpp)&png_ptr, (png_infopp)&info_ptr);

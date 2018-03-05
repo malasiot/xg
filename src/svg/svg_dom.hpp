@@ -17,6 +17,7 @@ class ViewBox {
 public:
 
     ViewBox() = default ;
+    ViewBox(float x, float y, float w, float h): x_(x), y_(y), width_(w), height_(h) {}
 
     void parse(const std::string &s) ;
 

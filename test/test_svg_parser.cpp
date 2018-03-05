@@ -1,4 +1,5 @@
-#include <xg/svg_document.hpp>
+#include <xg/canvas.hpp>
+
 #include <fstream>
 #include <iostream>
 
@@ -11,9 +12,18 @@ int main(int argc, char *argv[]) {
 
     SVGDocument doc ;
 
-    ifstream strm("/home/malasiot/Downloads/pencil.svg") ;
+    ifstream strm("/home/malasiot/Downloads/aa.svg") ;
     try {
         doc.readStream(strm) ;
+
+        ImageCanvas canvas(1024, 512) ;
+
+        canvas.setBrush(SolidBrush(NamedColor::white())) ;
+        canvas.drawRect(0, 0, 1024, 512) ;
+        canvas.drawSVG(doc) ;
+
+        canvas.getImage().saveToPNG("/tmp/oo.png") ;
+
     }
     catch ( SVGLoadException &e ) {
 

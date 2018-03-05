@@ -21,6 +21,7 @@ public:
 private:
 
     friend class SVGParser;
+    friend class Canvas ;
 
     std::shared_ptr<svg::SVGElement> root_ ;
 };

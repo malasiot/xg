@@ -1,5 +1,8 @@
 #include <xg/svg_document.hpp>
+#include <xg/canvas.hpp>
+
 #include "svg_parser.hpp"
+#include "svg_render_context.hpp"
 
 #include <sstream>
 
@@ -21,5 +24,10 @@ void SVGDocument::readStream(std::istream &strm) {
     parser.parseStream(strm) ;
 }
 
+void Canvas::drawSVG(const SVGDocument &doc)
+{
+    svg::RenderingContext ctx(*this) ;
+    ctx.render(*std::dynamic_pointer_cast<svg::SVGElement>(doc.root_)) ;
+}
 
 }

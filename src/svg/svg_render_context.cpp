@@ -36,7 +36,7 @@ float RenderingContext::toPixels(const Length &l, LengthDirection dir, bool scal
     case LengthUnitType::PT:
     case LengthUnitType::PC:
         if ( dir == LengthDirection::Horizontal  ) return  l.value() * factor * dpi_x_ ;
-        else if ( dir == LengthDirection::Horizontal ) return  l.value() * factor * dpi_y_ ;
+        else if ( dir == LengthDirection::Vertical ) return  l.value() * factor * dpi_y_ ;
         else if ( dir == LengthDirection::Absolute ) return  l.value() * factor*sqrt(dpi_x_ * dpi_y_) ;
     case LengthUnitType::EMS:
         return l.value() * default_font_size ;
@@ -47,7 +47,7 @@ float RenderingContext::toPixels(const Length &l, LengthDirection dir, bool scal
         float fy = ( scale_to_viewport ) ? view_boxes_.back().height_ : obbox_.height_ ;
 
         if ( dir == LengthDirection::Horizontal  ) return  l.value() *  fx ;
-        else if ( dir == LengthDirection::Horizontal ) return  l.value() * fy ;
+        else if ( dir == LengthDirection::Vertical ) return  l.value() * fy ;
         else if ( dir == LengthDirection::Absolute ) return  l.value() * sqrt(fx * fy) ;
     }
     }
@@ -60,28 +60,10 @@ void RenderingContext::render(SVGElement &e) {
 
     float xx, yy, sw, sh ;
 
-    if ( e.x_.unknown() ) xx = 0 ;
-    else xx = toPixels(e.x_, LengthDirection::Horizontal) ;
-
-    if ( e.y_.unknown() ) yy = 0 ;
-    else yy = toPixels(e.y_, LengthDirection::Vertical) ;
-
-    if ( e.width_.unknown() ) {
-        if ( e.parent_ )
-            sw = toPixels(1.0_perc, LengthDirection::Horizontal) ;
-        else sw = doc_width_hint_ ;
-    }
-    else
-        sw = toPixels(e.width_, LengthDirection::Horizontal) ;
-
-    if ( e.height_.unknown() ) {
-        if ( e.parent_ )
-            sh = toPixels(1.0_perc, LengthDirection::Vertical) ;
-        else sh = doc_height_hint_ ;
-    }
-    else
-        sh = toPixels(e.height_, LengthDirection::Horizontal) ;
-
+    xx = toPixels(e.x_, LengthDirection::Horizontal) ;
+    yy = toPixels(e.y_, LengthDirection::Vertical) ;
+    sw = toPixels(e.width_, LengthDirection::Horizontal) ;
+    sh = toPixels(e.height_, LengthDirection::Vertical) ;
 
     ViewBox vbox = e.view_box_ ;
 
@@ -100,7 +82,7 @@ void RenderingContext::render(SVGElement &e) {
     renderChildren(&e);
 
     canvas_.restore() ;
-    popState();
+
     view_boxes_.pop_back();
 }
 
@@ -184,7 +166,22 @@ void RenderingContext::setShapeAntialias (ShapeQuality aa) {
     }
 }
 
-void RenderingContext::renderShape()
+void RenderingContext::setLinearGradientBrush(LinearGradientElement &e, float a)
+{
+
+}
+
+void RenderingContext::setRadialGradientBrush(RadialGradientElement &e, float a)
+{
+
+}
+
+void RenderingContext::setPatternBrush(PatternElement &e, float a)
+{
+
+}
+
+void RenderingContext::setPaint()
 {
     Style &st = states_.back() ;
 
@@ -197,45 +194,52 @@ void RenderingContext::renderShape()
       ctx->extentBoundingBox(x1, y1, x2, y2) ;
 */
 
-    Pen pen ;
-    pen.setLineWidth(toPixels(st.getStrokeWidth(), LengthDirection::Absolute)) ;
-    pen.setMiterLimit(st.getMiterLimit()) ;
+    Paint stroke_paint = st.getStrokePaint() ;
 
-    switch ( st.getLineCap() ) {
-    case LineCapType::Butt:
-        pen.setLineCap(LineCap::Butt)  ;
-        break ;
-    case LineCapType::Round:
-        pen.setLineCap(LineCap::Round)  ;
-        break ;
-    case LineCapType::Square:
-        pen.setLineCap(LineCap::Square)  ;
-        break ;
-    }
+    if ( stroke_paint.type_ == PaintType::None ) ;
+    else if ( stroke_paint.type_ == PaintType::SolidColor ) {
+        Pen pen ;
+        pen.setLineWidth(toPixels(st.getStrokeWidth(), LengthDirection::Absolute)) ;
+        pen.setMiterLimit(st.getMiterLimit()) ;
 
-    switch ( st.getLineJoin() ) {
-    case LineJoinType::Bevel:
-        pen.setLineJoin(LineJoin::Bevel)  ;
-        break ;
-    case LineJoinType::Round:
-        pen.setLineJoin(LineJoin::Round)  ;
-        break ;
-    case LineJoinType::Miter:
-        pen.setLineJoin(LineJoin::Miter)  ;
-        break ;
-    }
-
-    std::vector<Length> dash_array = st.getDashArray() ;
-
-    if ( !dash_array.empty() ) {
-        vector<double> dashes ;
-        dashes.reserve(dash_array.size()) ;
-        for( const auto &l: dash_array ) {
-            dashes.emplace_back(toPixels(l, LengthDirection::Absolute)) ;
+        switch ( st.getLineCap() ) {
+        case LineCapType::Butt:
+            pen.setLineCap(LineCap::Butt)  ;
+            break ;
+        case LineCapType::Round:
+            pen.setLineCap(LineCap::Round)  ;
+            break ;
+        case LineCapType::Square:
+            pen.setLineCap(LineCap::Square)  ;
+            break ;
         }
 
-        pen.setDashArray(dashes) ;
-        pen.setDashOffset(toPixels(st.getDashOffset(), LengthDirection::Absolute)) ;
+        switch ( st.getLineJoin() ) {
+        case LineJoinType::Bevel:
+            pen.setLineJoin(LineJoin::Bevel)  ;
+            break ;
+        case LineJoinType::Round:
+            pen.setLineJoin(LineJoin::Round)  ;
+            break ;
+        case LineJoinType::Miter:
+            pen.setLineJoin(LineJoin::Miter)  ;
+            break ;
+        }
+
+        std::vector<Length> dash_array = st.getDashArray() ;
+
+        if ( !dash_array.empty() ) {
+            vector<double> dashes ;
+            dashes.reserve(dash_array.size()) ;
+            for( const auto &l: dash_array ) {
+                dashes.emplace_back(toPixels(l, LengthDirection::Absolute)) ;
+            }
+
+            pen.setDashArray(dashes) ;
+            pen.setDashOffset(toPixels(st.getDashOffset(), LengthDirection::Absolute)) ;
+        }
+
+        canvas_.setPen(pen) ;
     }
 
     Paint fill_paint = st.getFillPaint() ;
@@ -244,23 +248,24 @@ void RenderingContext::renderShape()
     else if ( fill_paint.type_ == PaintType::SolidColor ) {
         float fill_opacity = st.getFillOpacity() ;
         float opacity = st.getOpacity() ;
-        Color clr(fill_paint.clr_or_server_id_.get<CSSColor>(), fill_opacity * opacity) ;
+        const CSSColor &css_clr = fill_paint.clr_or_server_id_.get<CSSColor>() ;
+        Color clr(css_clr, 1 /*fill_opacity * opacity*/) ;
 
         canvas_.setBrush(SolidBrush(clr)) ;
     }
     else if ( fill_paint.type_ == PaintType::PaintServer ) {
         ElementPtr elem = lookupRef(fill_paint.clr_or_server_id_.get<std::string>()) ;
 
+        float fill_opacity = st.getFillOpacity() ;
+
         if ( elem ) {
-            /*
-                if ( elem->getType() == Element::LinearGradientElement )
-                    cairo_apply_linear_gradient(ctx, dynamic_cast<LinearGradient *>(elem.get()), st.fill_opacity_/255.0) ;
-                else if ( elem->getType() == Element::RadialGradientElement )
-                    cairo_apply_radial_gradient(ctx, dynamic_cast<RadialGradient *>(elem.get()), st.fill_opacity_/255.0) ;
-                else if ( elem->getType() == Element::PatternElement)
-                    cairo_apply_pattern(ctx, dynamic_cast<Pattern *>(elem.get()), st.fill_opacity_/255.0) ;
+            if ( auto p = std::dynamic_pointer_cast<LinearGradientElement>(elem) ) {
+                setLinearGradientBrush(*p, fill_opacity) ;
+            } else if ( auto p = std::dynamic_pointer_cast<RadialGradientElement>(elem) ) {
+                setRadialGradientBrush(*p, fill_opacity) ;
+            } else if ( auto p = std::dynamic_pointer_cast<PatternElement>(elem) ) {
+                setPatternBrush(*p, fill_opacity) ;
             }
-            */
         }
     }
 
@@ -268,7 +273,10 @@ void RenderingContext::renderShape()
 
 void RenderingContext::postRenderShape()
 {
+    canvas_.restore() ;
 
+    popTransform() ;
+    popState() ;
 }
 
 void RenderingContext::applyClipPath(ClipPathElement *e)
@@ -296,14 +304,17 @@ void RenderingContext::render(PolylineElement &)
 
 }
 
-void RenderingContext::render(PathElement &)
-{
-
+void RenderingContext::render(PathElement &e) {
+    preRenderShape(e.style_, e.trans_.m_) ;
+    setPaint() ;
+    canvas_.drawPath(e.path_.path_) ;
+    postRenderShape() ;
 }
 
 void RenderingContext::render(RectElement &rect)
 {
     preRenderShape(rect.style_, rect.trans_.m_) ;
+    setPaint() ;
 
     double rxp = toPixels(rect.rx_, LengthDirection::Horizontal) ;
     double ryp = toPixels(rect.ry_, LengthDirection::Vertical) ;
@@ -319,8 +330,6 @@ void RenderingContext::render(RectElement &rect)
     else if (ryp == 0) ryp = rxp ;
 
     canvas_.drawPath(Path().addRoundedRect(xp, yp, wp, hp, rxp, ryp)) ;
-
-    renderShape() ;
 
     postRenderShape() ;
 }
