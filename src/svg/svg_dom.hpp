@@ -203,8 +203,6 @@ public:
 
     virtual bool canHaveChild(const ElementPtr &p) const { return false ; }
 
-    virtual void setHRef(Element *e) {}
-
     bool addChild(const ElementPtr &p) {
         if ( !canHaveChild(p) ) return false ;
         children_.emplace_back(p) ;
@@ -214,7 +212,7 @@ public:
 
     std::string id_ ;
     Element *parent_ = nullptr ;
-    ElementPtr *href_ = nullptr ;
+    Element *href_ = nullptr ;
 
     std::vector<ElementPtr> children_ ;
 } ;
@@ -267,6 +265,7 @@ public:
 } ;
 
 
+
 class StyleElement: public Element {
 public:
 
@@ -312,6 +311,11 @@ public:
     LinearGradientElement() = default ;
 
     void parseAttributes(const Dictionary &a, HRefResolver &r) ;
+
+    Length x1() const ;
+    Length y1() const ;
+    Length x2() const ;
+    Length y2() const ;
 
     Attribute<Length> x1_{0.0_perc}, y1_{0.0_perc}, x2_{1.0_perc}, y2_{0.0_perc} ;
 } ;

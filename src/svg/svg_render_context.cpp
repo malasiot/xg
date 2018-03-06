@@ -172,7 +172,7 @@ void RenderingContext::setShapeAntialias (ShapeQuality aa) {
 
 void RenderingContext::setLinearGradientBrush(LinearGradientElement &e, float a)
 {
-    Length x1 = e.x1_.value(), y1 = e.y1_.value(), x2 = e.x2_.value(), y2 = e.y2_.value() ;
+    Length x1 = e.x1(), y1 = e.y1(), x2 = e.x2(), y2 = e.y2() ;
 
     GradientSpreadMethod sm = e.spread_method_.value() ;
     GradientUnits gu = e.gradient_units_.value() ;

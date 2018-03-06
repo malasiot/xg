@@ -26,7 +26,7 @@ void Element::parseAttributes(const Dictionary &attrs, HRefResolver &r) {
     id_ = attrs.get("id") ;
     r.addElement(id_, this);
 
-    attrs.visit("xlink::href", [&](const string &v) {
+    attrs.visit("xlink:href", [&](const string &v) {
         r.addReference(this, v) ;
     }) ;
 }
@@ -248,6 +248,29 @@ void LinearGradientElement::parseAttributes(const Dictionary &attrs, HRefResolve
     parse_inheritable_attribute("y1", attrs, y1_) ;
     parse_inheritable_attribute("y2", attrs, y2_) ;
 }
+
+#define INHERIT_ATTRIBUTE(className, funcName, attrName, attrType)\
+attrType className::funcName() const {\
+    if ( attrName.hasValue() ) return attrName.value() ;\
+    Element *p = href_ ;\
+    className *q = nullptr ;\
+    \
+    while (p) {\
+        q = dynamic_cast<className *>(p) ;\
+        if ( !q ) break ;\
+        if ( q->attrName.hasValue() ) \
+            return q->attrName.value() ;\
+     \
+        p = p->href_ ;\
+    }\
+    \
+    return attrName.value() ;\
+}\
+
+INHERIT_ATTRIBUTE(LinearGradientElement, x1, x1_, Length)
+INHERIT_ATTRIBUTE(LinearGradientElement, x2, x2_, Length)
+INHERIT_ATTRIBUTE(LinearGradientElement, y1, y1_, Length)
+INHERIT_ATTRIBUTE(LinearGradientElement, y2, y2_, Length)
 
 void RadialGradientElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {

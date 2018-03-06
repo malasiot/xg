@@ -28,7 +28,7 @@ public:
         for( const auto &p: refs_ ) {
             auto it = elements_.find(p.second) ;
             if ( it != elements_.end() )
-                p.first->setHRef(it->second) ;
+                p.first->href_ = it->second ;
         }
 
         for( const auto &p: paint_refs_ ) {

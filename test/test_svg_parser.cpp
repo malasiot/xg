@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
 
     SVGDocument doc ;
 
-    ifstream strm("/home/malasiot/Downloads/lg.svg") ;
+    ifstream strm("/home/malasiot/Downloads/lineargradient1.svg") ;
     try {
         doc.readStream(strm) ;
 
