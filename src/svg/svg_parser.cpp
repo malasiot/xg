@@ -108,7 +108,7 @@ void SVGParser::beginElement(const string &name, const Dictionary &attributes) {
     else if ( name == "style" )
         createNode<svg::StyleElement>(attributes) ;
     else if ( name == "stop" )
-        createNode<svg::Stop>(attributes) ;
+        createNode<svg::StopElement>(attributes) ;
     else
         createNode<svg::UnsupportedElement>(attributes) ;
 }

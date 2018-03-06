@@ -49,7 +49,7 @@ private:
     Color clr_ ;
 } ;
 
-enum SpreadMethod { PadSpread, RepeatSpread, ReflectSpread } ;
+enum class SpreadMethod { Pad, Repeat, Reflect } ;
 enum BrushUnits { UserSpaceOnUse, ObjectBoundingBox } ;
 
 class GradientBrush: public Brush {
@@ -57,7 +57,7 @@ class GradientBrush: public Brush {
 public:
 
     void setSpread(SpreadMethod method) { sm_ = method ; }
-    void setMatrix2d(const Matrix2d &trans) { tr_ = trans ; }
+    void setTransform(const Matrix2d &trans) { tr_ = trans ; }
     void setUnits(BrushUnits un) { gu_ = un ; }
 
 
@@ -80,7 +80,7 @@ public:
 
 protected:
 
-    GradientBrush(): sm_(PadSpread) {}
+    GradientBrush(): sm_(SpreadMethod::Pad) {}
 
 private:
 

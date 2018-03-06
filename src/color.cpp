@@ -45,7 +45,7 @@ static int css_clip_rgb (int rgb)
 }
 
 static bool parse_css_color(const string &str, unsigned char &r, unsigned char &g, unsigned char &b) {
-    static regex clr_regex_1("#([0-9a-f])([0-9a-f])([0-9a-f])(?:([0-9a-f])([0-9a-f])([0-9a-f]))?", std::regex::icase) ;
+    static regex clr_regex_1("#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])(?:([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F]))?", std::regex::icase) ;
     static regex clr_regex_2("rgb\\([\\s]*([0-9]+)[\\s]*,[\\s]*([0-9]+)[\\s]*,[\\s]*([0-9]+)[\\s]*\\)[\\s]*", std::regex::icase) ;
     static regex clr_regex_3("rgb\\([\\s]*([0-9]+)\\%[\\s]*,[\\s]*([0-9]+)\\%[\\s]*,[\\s]*([0-9]+)[\\s]*\\)[\\s]*", std::regex::icase) ;
 

@@ -43,8 +43,8 @@ float RenderingContext::toPixels(const Length &l, LengthDirection dir, bool scal
     case LengthUnitType::EXS:
         return l.value() * default_font_size * 0.5;
     case LengthUnitType::Percentage: {
-        float fx = ( scale_to_viewport ) ? view_boxes_.back().width_ : obbox_.width_ ;
-        float fy = ( scale_to_viewport ) ? view_boxes_.back().height_ : obbox_.height_ ;
+        float fx = ( scale_to_viewport ) ? view_boxes_.back().width_ : obbox_.width() ;
+        float fy = ( scale_to_viewport ) ? view_boxes_.back().height_ : obbox_.height() ;
 
         if ( dir == LengthDirection::Horizontal  ) return  l.value() *  fx ;
         else if ( dir == LengthDirection::Vertical ) return  l.value() * fy ;
@@ -121,18 +121,17 @@ ElementPtr RenderingContext::lookupRef(const std::string &name) {
 }
 
 void RenderingContext::populateRefs(const ElementPtr &p) {
+    string id = p->id_ ;
+
+    if ( !id.empty() ) refs_['#' + id] = p ;
 
     for( const auto el: p->children_ ) {
-        string id = el->id_ ;
-
-        if ( !id.empty() ) refs_['#' + id] = el ;
-
         populateRefs(el) ;
     }
 
 }
 
-void RenderingContext::preRenderShape(const Style &s, const Matrix2d &t)
+void RenderingContext::preRenderShape(const Style &s, const Matrix2d &t, const Rectangle2d &bounds)
 {
     pushState(s) ;
     pushTransform(t) ;
@@ -141,6 +140,8 @@ void RenderingContext::preRenderShape(const Style &s, const Matrix2d &t)
 
     canvas_.save() ;
     canvas_.setTransform(t) ;
+
+    obbox_ = bounds ;
 
     if ( rendering_mode_ == RenderingMode::Display ) {
         string cp_id = st.getClipPath() ;
@@ -168,13 +169,127 @@ void RenderingContext::setShapeAntialias (ShapeQuality aa) {
     }
 }
 
+
 void RenderingContext::setLinearGradientBrush(LinearGradientElement &e, float a)
 {
+    Length x1 = e.x1_.value(), y1 = e.y1_.value(), x2 = e.x2_.value(), y2 = e.y2_.value() ;
 
+    GradientSpreadMethod sm = e.spread_method_.value() ;
+    GradientUnits gu = e.gradient_units_.value() ;
+
+    double ix1, iy1, ix2, iy2 ;
+
+    ix1 = ( gu == GradientUnits::ObjectBoundingBox ) ?
+                x1.value() : toPixels(x1, LengthDirection::Horizontal) ;
+
+    iy1 = ( gu == GradientUnits::ObjectBoundingBox ) ?
+                y1.value() : toPixels(y1, LengthDirection::Vertical) ;
+
+    iy2 = ( gu == GradientUnits::ObjectBoundingBox ) ?
+                y2.value() : toPixels(y2, LengthDirection::Vertical) ;
+
+    ix2 = ( gu == GradientUnits::ObjectBoundingBox ) ?
+                x2.value() : toPixels(ctx, LengthDirection::Horizontal) ;
+
+    Matrix2d gtrans = e.trans_.value() ;
+
+    if ( gu == GradientUnits::ObjectBoundingBox ) {
+        Matrix2d obbm ;
+
+        obbm.scale(obbox_.width(), obbox_.height()) ;
+        obbm.translate(obbox_.x(), obbox_.y()) ;
+
+        gtrans.premult(obbm) ;
+    }
+
+    LinearGradientBrush brush(ix1, iy1, ix2, iy2) ;
+    brush.setTransform(gtrans) ;
+
+    if ( sm == GradientSpreadMethod::Reflect )
+        brush.setSpread(SpreadMethod::Reflect) ;
+    else if ( sm == GradientSpreadMethod::Repeat )
+        brush.setSpread(SpreadMethod::Repeat) ;
+    else
+        brush.setSpread(SpreadMethod::Pad) ;
+
+    float gopac = states_.back().getOpacity() ;
+
+    for( const auto &c: e.children_ ) {
+        auto p = dynamic_cast<StopElement *>(c.get()) ;
+        if ( p ) {
+           const CSSColor &stop_clr = p->style_.getStopColor() ;
+           float stop_opacity =  p->style_.getStopOpacity() ;
+           float offset = p->offset_.value() ;
+
+           brush.addStop(offset, Color(stop_clr, stop_opacity * a * gopac)) ;
+        }
+
+    }
+
+    canvas_.setBrush(brush) ;
 }
 
 void RenderingContext::setRadialGradientBrush(RadialGradientElement &e, float a)
 {
+    double ifx, ify, icx, icy, ir ;
+
+    Length cx = e.cx_, cy = e.cy_, fx = e.fx_, fy = e.fy_, r = e.r_ ;
+
+    GradientSpreadMethod sm = e.spread_method_.value() ;
+    GradientUnits gu = e.gradient_units_.value() ;
+
+    double ix1, iy1, ix2, iy2 ;
+
+    icx = ( gu == GradientUnits::ObjectBoundingBox ) ?
+                cx.value() : toPixels(cx, LengthDirection::Horizontal) ;
+
+    icy = ( gu == GradientUnits::ObjectBoundingBox ) ?
+                cy.value() : toPixels(cy, LengthDirection::Vertical) ;
+
+    ifx = ( gu == GradientUnits::ObjectBoundingBox ) ?
+                fx.value() : toPixels(fx, LengthDirection::Horizontal) ;
+
+    ify = ( gu == GradientUnits::ObjectBoundingBox ) ?
+                fy.value() : toPixels(fy, LengthDirection::Vertical) ;
+
+    ir = ( gu == GradientUnits::ObjectBoundingBox ) ?
+                r.value() : toPixels(r, LengthDirection::Absolute) ;
+
+    Matrix2d gtrans = e.trans_.value() ;
+
+    if ( gu == GradientUnits::ObjectBoundingBox ) {
+        Matrix2d obbm ;
+
+        obbm.scale(obbox_.width(), obbox_.height()) ;
+        obbm.translate(obbox_.x(), obbox_.y()) ;
+
+        gtrans.premult(obbm) ;
+    }
+
+    RadialGradientBrush brush(icx, icy, ir, ifx, ify) ;
+    brush.setTransform(gtrans) ;
+
+    if ( sm == GradientSpreadMethod::Reflect )
+        brush.setSpread(SpreadMethod::Reflect) ;
+    else if ( sm == GradientSpreadMethod::Repeat )
+        brush.setSpread(SpreadMethod::Repeat) ;
+    else
+        brush.setSpread(SpreadMethod::Pad) ;
+
+    float gopac = states_.back().getOpacity() ;
+
+    for( const auto &c: e.children_ ) {
+        auto p = dynamic_cast<StopElement *>(c.get()) ;
+        if ( p ) {
+           const CSSColor &stop_clr = p->style_.getStopColor() ;
+           float stop_opacity =  p->style_.getStopOpacity() ;
+           float offset = p->offset_.value() ;
+
+           brush.addStop(offset, Color(stop_clr, stop_opacity * a * gopac)) ;
+        }
+    }
+
+    canvas_.setBrush(brush) ;
 
 }
 
@@ -241,6 +356,12 @@ void RenderingContext::setPaint()
             pen.setDashOffset(toPixels(st.getDashOffset(), LengthDirection::Absolute)) ;
         }
 
+        float stroke_opacity = st.getStrokeOpacity() ;
+        float opacity = st.getOpacity() ;
+        const CSSColor &css_clr = stroke_paint.clr_or_server_id_.get<CSSColor>() ;
+        Color clr(css_clr, stroke_opacity * opacity) ;
+        pen.setColor(clr) ;
+
         canvas_.setPen(pen) ;
     }
 
@@ -256,16 +377,17 @@ void RenderingContext::setPaint()
         canvas_.setBrush(SolidBrush(clr)) ;
     }
     else if ( fill_paint.type_ == PaintType::PaintServer ) {
-        ElementPtr elem = lookupRef(fill_paint.clr_or_server_id_.get<std::string>()) ;
+     //  ElementPtr elem = lookupRef(fill_paint.clr_or_server_id_.get<std::string>()) ;
+        Element *elem = fill_paint.clr_or_server_id_.get<Element *>() ;
 
         float fill_opacity = st.getFillOpacity() ;
 
         if ( elem ) {
-            if ( auto p = std::dynamic_pointer_cast<LinearGradientElement>(elem) ) {
+            if ( auto p = dynamic_cast<LinearGradientElement *>(elem) ) {
                 setLinearGradientBrush(*p, fill_opacity) ;
-            } else if ( auto p = std::dynamic_pointer_cast<RadialGradientElement>(elem) ) {
+            } else if ( auto p = dynamic_cast<RadialGradientElement *>(elem) ) {
                 setRadialGradientBrush(*p, fill_opacity) ;
-            } else if ( auto p = std::dynamic_pointer_cast<PatternElement>(elem) ) {
+            } else if ( auto p = dynamic_cast<PatternElement *>(elem) ) {
                 setPatternBrush(*p, fill_opacity) ;
             }
         }
@@ -307,7 +429,7 @@ void RenderingContext::render(PolylineElement &)
 }
 
 void RenderingContext::render(PathElement &e) {
-    preRenderShape(e.style_, e.trans_.m_) ;
+    preRenderShape(e.style_, e.trans_, Rectangle2d()) ;
     setPaint() ;
     canvas_.drawPath(e.path_.path_) ;
     postRenderShape() ;
@@ -315,8 +437,7 @@ void RenderingContext::render(PathElement &e) {
 
 void RenderingContext::render(RectElement &rect)
 {
-    preRenderShape(rect.style_, rect.trans_.m_) ;
-    setPaint() ;
+
 
     double rxp = toPixels(rect.rx_, LengthDirection::Horizontal) ;
     double ryp = toPixels(rect.ry_, LengthDirection::Vertical) ;
@@ -330,6 +451,10 @@ void RenderingContext::render(RectElement &rect)
 
     if (rxp == 0) rxp = ryp;
     else if (ryp == 0) ryp = rxp ;
+
+    preRenderShape(rect.style_, rect.trans_, Rectangle2d(xp, yp, wp, hp)) ;
+    setPaint() ;
+
 
     canvas_.drawPath(Path().addRoundedRect(xp, yp, wp, hp, rxp, ryp)) ;
 
@@ -381,7 +506,7 @@ void RenderingContext::render(SymbolElement &)
 }
 
 void RenderingContext::render(GroupElement &g) {
-     preRenderShape(g.style_, g.trans_.m_) ;
+     preRenderShape(g.style_, g.trans_, Rectangle2d()) ;
      renderChildren(&g) ;
      postRenderShape() ;
 

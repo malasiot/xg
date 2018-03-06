@@ -9,11 +9,15 @@
 
 #include "svg_length.hpp"
 
+
 #include <xg/util/variant.hpp>
 #include <xg/color.hpp>
 
 namespace xg {
 namespace svg {
+
+class HRefResolver ;
+class Element ;
 
 enum class StyleAttributeType { Font, FontFamily, FontSize, FontSizeAdjust,
     FontStretch, FontStyle, FontVariant, FontWeight,
@@ -65,16 +69,22 @@ struct Paint {
 
     PaintType type_ ;
 
-    Variant<CSSColor, std::string> clr_or_server_id_ ;
+    Variant<CSSColor, Element *> clr_or_server_id_ ;
 } ;
 
 struct FillPaint: public Paint {
+    FillPaint(Element *e): Paint(PaintType::PaintServer) {
+        clr_or_server_id_.set<Element *>(e) ;
+    }
     FillPaint(): Paint(PaintType::SolidColor) {
         clr_or_server_id_.set<CSSColor>(0, 0, 0) ;
     }
 } ;
 
 struct StrokePaint: public Paint {
+    StrokePaint(Element *e): Paint(PaintType::PaintServer) {
+        clr_or_server_id_.set<Element *>(e) ;
+    }
     StrokePaint(): Paint(PaintType::None) {
     }
 } ;
@@ -99,11 +109,14 @@ class Style
     FillPaint getFillPaint() const { return findAttribute<FillPaint>(StyleAttributeType::Fill, FillPaint()) ; }
     StrokePaint getStrokePaint() const { return findAttribute<StrokePaint>(StyleAttributeType::Stroke, StrokePaint()) ; }
     float getFillOpacity() const { return findAttribute<float>(StyleAttributeType::FillOpacity, 1.0) ; }
+    float getStrokeOpacity() const { return findAttribute<float>(StyleAttributeType::StrokeOpacity, 1.0) ; }
     float getOpacity() const { return findAttribute<float>(StyleAttributeType::Opacity, 1.0) ; }
 
+    CSSColor getStopColor() const { return findAttribute<CSSColor>(StyleAttributeType::StopColor, NamedColor::black()) ; }
+    float getStopOpacity() const { return findAttribute<float>(StyleAttributeType::StopOpacity, 1.0) ; }
 
-    void parseNameValue(const std::string &name, const std::string &val) ;
-    void fromStyleString(const std::string &str) ;
+    void parseNameValue(const std::string &name, const std::string &val, HRefResolver &) ;
+    void fromStyleString(const std::string &str, HRefResolver &) ;
 
     bool hasAttribute(StyleAttributeType f) const {
         return attributes_.find(f) != attributes_.end() ;
@@ -132,6 +145,8 @@ class Style
 
 private:
 
+    friend class HRefResolver ;
+
 
     using attribute_value_t = Variant<float, std::string, Length, CSSColor, FillPaint, StrokePaint, dash_array_t, FillRule, LineJoinType, LineCapType,  FontStyle,
         FontVariant, FontWeight, FontStretch, FontSize, TextDecoration, TextAnchor,
@@ -139,7 +154,14 @@ private:
 
     std::map<StyleAttributeType, attribute_value_t> attributes_ ;
 
-    void parsePaint(const std::string &str, Paint &p)  ;
+    void parsePaint(const std::string &str, Paint &p, HRefResolver &r, bool fill_or_stroke)  ;
+    void setFillPaintServer(Element *e) {
+        setAttribute<FillPaint>(StyleAttributeType::Fill, FillPaint(e)) ;
+    }
+    void setStrokePaintServer(Element *e) {
+        setAttribute<StrokePaint>(StyleAttributeType::Stroke, StrokePaint(e)) ;
+    }
+
 } ;
 
 } // namespace svg

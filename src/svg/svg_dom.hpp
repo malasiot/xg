@@ -13,6 +13,8 @@
 namespace xg {
 namespace svg {
 
+class HRefResolver ;
+
 class ViewBox {
 public:
 
@@ -96,7 +98,7 @@ public:
 
     virtual ~Stylable() {}
 
-    void parseAttributes(const Dictionary &p) ;
+    void parseAttributes(const Dictionary &p, HRefResolver &r) ;
 
     Style style_ ;
 } ;
@@ -109,7 +111,7 @@ public:
 
     void parseAttributes(const Dictionary &pNode) ;
 
-    Transform trans_ ;
+    Matrix2d trans_ ;
 } ;
 
 class FitToViewBox
@@ -122,6 +124,8 @@ public:
     PreserveAspectRatio preserve_aspect_ratio_ ;
 
 } ;
+
+
 
 class URI {
 public:
@@ -195,9 +199,11 @@ public:
     Element() = default ;
     virtual ~Element() = default ;
 
-    void parseAttributes(const Dictionary &a) ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r) ;
 
     virtual bool canHaveChild(const ElementPtr &p) const { return false ; }
+
+    virtual void setHRef(Element *e) {}
 
     bool addChild(const ElementPtr &p) {
         if ( !canHaveChild(p) ) return false ;
@@ -208,6 +214,7 @@ public:
 
     std::string id_ ;
     Element *parent_ = nullptr ;
+    ElementPtr *href_ = nullptr ;
 
     std::vector<ElementPtr> children_ ;
 } ;
@@ -239,25 +246,46 @@ ClipPathElement, ImageElement, PatternElement, StyleElement, TextElement> ;
 
 using ShapeContainer = Container<CircleElement, LineElement, PolylineElement, PolygonElement, RectElement, PathElement, EllipseElement, UseElement, TextElement> ;
 
+template<typename S>
+class Attribute {
+public:
+
+    typedef S type ;
+
+    Attribute(const S &def): default_value_(def) {}
+
+    Attribute(const Attribute<S> &) = delete ;
+    Attribute &operator = ( const Attribute<S> &) = delete ;
+
+    S value() const { return ( has_value_ ) ? assigned_value_ : default_value_ ; }
+    void assign(const S &val) { assigned_value_ = val ; has_value_ = true ; }
+    bool hasValue() const { return has_value_ ;}
+
+    S default_value_  ;
+    S assigned_value_ ;
+    bool has_value_ = false ;
+} ;
+
+
 class StyleElement: public Element {
 public:
 
     StyleElement() = default ;
 
-    void parseAttributes(const Dictionary &) ;
+    void parseAttributes(const Dictionary &, HRefResolver &r) ;
 
     std::string type_, media_, title_ ;
 } ;
 
 
-class Stop: public Element, public Stylable {
+class StopElement: public Element, public Stylable {
 public:
 
-    Stop(): offset_(0.0) {}
+    StopElement() = default ;
 
-    void parseAttributes(const Dictionary &p) ;
+    void parseAttributes(const Dictionary &p, HRefResolver &r) ;
 
-    Length offset_{0.0} ;
+    Attribute<float> offset_{0.0} ;
 } ;
 
 
@@ -265,39 +293,37 @@ public:
 enum class GradientSpreadMethod { Unknown, Pad, Reflect, Repeat } ;
 enum class GradientUnits { UserSpaceOnUse, ObjectBoundingBox } ;
 
-class GradientElement: public Container<Stop>, public Stylable {
+class GradientElement: public Container<StopElement>, public Stylable {
 public:
 
-    GradientElement(): spread_method_(GradientSpreadMethod::Pad), gradient_units_(GradientUnits::ObjectBoundingBox) { }
+    GradientElement(): spread_method_(GradientSpreadMethod::Pad), gradient_units_(GradientUnits::ObjectBoundingBox), trans_(Matrix2d()) { }
 
-    void parseAttributes(const Dictionary &pNode) ;
+    void parseAttributes(const Dictionary &pNode, HRefResolver &r) ;
 
-    GradientSpreadMethod spread_method_ ;
-    GradientUnits gradient_units_ ;
-    Transform trans_ ;
-    std::string href_ ;
+    Attribute<GradientSpreadMethod> spread_method_ ;
+    Attribute<GradientUnits> gradient_units_ ;
+    Attribute<Matrix2d> trans_ ;
+
 } ;
 
 class LinearGradientElement: public GradientElement {
 public:
 
-    LinearGradientElement() { x1_ = y1_ = y2_ = x2_ = Length(0.5_perc) ; }
+    LinearGradientElement() = default ;
 
-    void parseAttributes(const Dictionary &a) ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r) ;
 
-    Length x1_, y1_, x2_, y2_ ;
+    Attribute<Length> x1_{0.0_perc}, y1_{0.0_perc}, x2_{1.0_perc}, y2_{0.0_perc} ;
 } ;
 
 class RadialGradientElement: public GradientElement {
 public:
 
-    RadialGradientElement() {
-        cx_ = cy_ = r_ = fx_ = fy_  = Length(0.5_perc) ;
-    }
+    RadialGradientElement() = default ;
 
-    void parseAttributes(const Dictionary &a) ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r) ;
 
-    Length cx_, cy_, r_, fx_, fy_ ;
+    Length cx_{0.5_perc}, cy_{0.5_perc}, r_{0.5_perc}, fx_, fy_ ;
 } ;
 
 enum class PatternUnits { UserSpaceOnUse, ObjectBoundingBox } ;
@@ -305,16 +331,17 @@ enum class PatternUnits { UserSpaceOnUse, ObjectBoundingBox } ;
 class PatternElement:
         public GroupContainer,
         public Stylable, public FitToViewBox
+
 {
 public:
 
     PatternElement(): pattern_content_units_(PatternUnits::UserSpaceOnUse), pattern_units_(PatternUnits::ObjectBoundingBox) {  }
 
-    void parseAttributes(const Dictionary &a) ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r) ;
 
     PatternUnits pattern_units_ ;
     PatternUnits pattern_content_units_ ;
-    Transform trans_ ;
+    Matrix2d trans_ ;
     std::string href_ ;
     Length x_, y_, width_, height_ ;
 } ;
@@ -326,7 +353,7 @@ public:
 
     ImageElement() = default ;
 
-    void parseAttributes(const Dictionary &attrs) ;
+    void parseAttributes(const Dictionary &attrs, HRefResolver &r) ;
 
     URI uri_ ;
     Length x_{0}, y_{0}, width_{0}, height_{0} ;
@@ -343,7 +370,7 @@ public:
 
     ClipPathElement(): clip_path_units_(UserSpaceOnUse) {}
 
-    void parseAttributes(const Dictionary &a) ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r) ;
 
     ClipPathUnits clip_path_units_ ;
 
@@ -354,7 +381,7 @@ class UseElement: public GroupContainer, public Transformable, public Stylable
 public:
     UseElement() = default ;
 
-    void parseAttributes(const Dictionary &a)  ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r)  ;
 
     Length x_{0}, y_{0}, width_, height_ ;
     URI uri_ ;
@@ -369,7 +396,7 @@ public:
 
     GroupElement() = default ;
 
-    void parseAttributes(const Dictionary &a)  ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r)  ;
 } ;
 
 class DefsElement: public GroupContainer, public Transformable, public Stylable {
@@ -377,7 +404,7 @@ public:
 
     DefsElement() = default ;
 
-    void parseAttributes(const Dictionary &a)  ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r)  ;
 } ;
 
 class PathElement: public Element, public Transformable, public Stylable {
@@ -385,7 +412,7 @@ public:
 
     PathElement() = default ;
 
-    void parseAttributes(const Dictionary &a)  ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r)  ;
 
     PathData path_ ;
 } ;
@@ -395,7 +422,7 @@ public:
 
     RectElement() {}
 
-    void parseAttributes(const Dictionary &a)  ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r)  ;
 
     Length x_, y_, width_, height_, rx_, ry_ ;
 } ;
@@ -405,7 +432,7 @@ public:
 
     CircleElement() {}
 
-    void parseAttributes(const Dictionary &a)  ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r)  ;
 
     Length cx_, cy_, r_ ;
 } ;
@@ -415,7 +442,7 @@ public:
 
     LineElement() = default ;
 
-    void parseAttributes(const Dictionary &a)  ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r)  ;
 
     Length x1_, y1_, x2_, y2_ ;
 } ;
@@ -425,7 +452,7 @@ public:
 
     EllipseElement() = default ;
 
-    void parseAttributes(const Dictionary &a)  ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r)  ;
 
     Length cx_, cy_, rx_, ry_ ;
 } ;
@@ -435,7 +462,7 @@ public:
 
     PolylineElement() = default ;
 
-    void parseAttributes(const Dictionary &a)  ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r)  ;
 
     PointList points_ ;
 } ;
@@ -445,7 +472,7 @@ public:
 
     PolygonElement() = default ;
 
-    void parseAttributes(const Dictionary &a)  ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r)  ;
 
     PointList points_ ;
 } ;
@@ -456,7 +483,7 @@ public:
 
     TextPosElement() = default ;
 
-    void parseAttributes(const Dictionary &pNode) ;
+    void parseAttributes(const Dictionary &pNode, HRefResolver &r) ;
 
     Length x_{0}, y_{0}, dx_{0}, dy_{0} ;
     bool preserve_white_{false} ;
@@ -468,7 +495,7 @@ public:
 
     TextElement() {}
 
-    void parseAttributes(const Dictionary &a) ;
+    void parseAttributes(const Dictionary &a, HRefResolver &r) ;
 } ;
 
 
@@ -498,6 +525,26 @@ inline void parse_element_attribute(const char *name, const Dictionary &attr, T 
     }
 }
 
+template<typename T>
+inline void parse_inheritable_attribute(const char *name, const Dictionary &attr, T &t) {
+
+    std::string value = attr.get(name) ;
+    try {
+        if ( !value.empty() ) {
+            typename T::type v ;
+            v.parse(value) ;
+            t.assign(v) ;
+        }
+    }
+    catch ( SVGDOMAttributeValueException &e ) {
+        std::string reason = e.what() ;
+        std::stringstream strm ;
+        strm << "invalid value \"" << value << "\" of attribute \"" << name << "\"" ;
+        if ( !reason.empty() ) strm << ": " << reason ;
+        throw SVGDOMException(strm.str()) ;
+    }
+}
+
 
 
 class SVGElement: public GroupContainer, public Stylable, public FitToViewBox {
@@ -508,7 +555,7 @@ public:
         width_{1.0_perc}, height_{1.0_perc} {
     }
 
-    void parseAttributes(const Dictionary &attrs) ;
+    void parseAttributes(const Dictionary &attrs, HRefResolver &r) ;
 
     void parseCSS(const std::string &str) ;
 
@@ -526,7 +573,7 @@ public:
 class UnsupportedElement: public Element {
 public:
      bool canHaveChild(const std::shared_ptr<Element> &p) const override { return true ; }
-     void parseAttributes(const Dictionary &) {}
+     void parseAttributes(const Dictionary &, HRefResolver &r) {}
 };
 
 } // namespace svg

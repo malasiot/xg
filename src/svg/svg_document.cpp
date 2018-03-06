@@ -3,6 +3,7 @@
 
 #include "svg_parser.hpp"
 #include "svg_render_context.hpp"
+#include "svg_href_resolver.hpp"
 
 #include <sstream>
 
@@ -20,14 +21,18 @@ std::string SVGLoadException::what() {
 }
 
 void SVGDocument::readStream(std::istream &strm) {
-    SVGParser parser(*this) ;
+    svg::HRefResolver resolver ;
+    SVGParser parser(*this, resolver) ;
     parser.parseStream(strm) ;
+    resolver.resolve() ;
 }
 
 void Canvas::drawSVG(const SVGDocument &doc)
 {
     svg::RenderingContext ctx(*this) ;
-    ctx.render(*std::dynamic_pointer_cast<svg::SVGElement>(doc.root_)) ;
+    ctx.populateRefs(doc.root_);
+    auto root = std::dynamic_pointer_cast<svg::SVGElement>(doc.root_) ;
+    ctx.render(*root) ;
 }
 
 }

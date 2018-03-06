@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include <xg/xform.hpp>
+
 namespace xg {
 
 // parse number in string
@@ -20,5 +22,8 @@ std::string parse_uri(const std::string &src) ;
 
 void eat_white(const char *&p) ;
 void eat_white_comma(const char *&p) ;
+
+bool parse_transform(const std::string &str, Matrix2d &res) ;
+
 }
 #endif

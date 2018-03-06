@@ -6,24 +6,30 @@
 #include <iostream>
 
 #include "svg_dom.hpp"
+#include "svg_href_resolver.hpp"
 
 namespace xg {
 
 class SVGLoadException ;
 class SVGDocument ;
 
+namespace svg {
+class HRefResolver ;
+}
+
 class SVGParser {
 public:
-    SVGParser(SVGDocument &doc): document_(doc) {}
+    SVGParser(SVGDocument &doc, svg::HRefResolver &res): document_(doc), resolver_(res) {}
 
     void parseString(const std::string &xml) ;
     void parseStream(std::istream &strm, size_t buffer_sz = 1024) ;
 protected:
 
+
     template <typename T>
     std::shared_ptr<T> createNode(const Dictionary &a) {
         auto node = std::make_shared<T>() ;
-        node->parseAttributes(a) ;
+        node->parseAttributes(a, resolver_) ;
         auto ele = std::dynamic_pointer_cast<svg::Element>(node) ;
 
         if ( !nodes_.empty() ) {
@@ -33,6 +39,8 @@ protected:
         nodes_.push_back(ele) ;
         return node ;
     }
+
+
     void beginElement(const std::string &name, const Dictionary &attributes) ;
     void endElement() ;
 
@@ -49,6 +57,7 @@ private:
     SVGDocument &document_ ;
     std::deque<std::shared_ptr<svg::Element>> nodes_ ;
     std::deque<std::string> elements_ ;
+    svg::HRefResolver &resolver_ ;
 };
 
 

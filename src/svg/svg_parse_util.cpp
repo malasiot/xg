@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include <xg/util/strings.hpp>
+#include "svg_dom_exceptions.hpp"
 
 using namespace std ;
 
@@ -19,21 +20,7 @@ bool parse_number(const std::string &s, float &val) {
 
     return true ;
 }
-/*
-bool parse_coordinate_list(const std::string &p, vector<float> &args)
-{
-    auto tokens = split(p, ", ") ;
 
-    for ( const string &s: tokens ) {
-
-        float val ;
-        if ( !parse_number(s, val) ) return false ;
-        else args.emplace_back(val) ;
-    }
-
-    return true ;
-}
-*/
 
 bool parse_coordinate_list(const std::string &s, vector<float> &args)
 {
@@ -125,5 +112,93 @@ void eat_white_comma(const char *&p)
     while (*p != 0 && ( isspace(*p) || *p == ',' ) ) ++p ;
 }
 
+static bool parse_number_list(const char *&p, vector<float> &numbers)
+{
+    eat_white(p) ;
+    if ( *p++ != '(' )
+        return false ;
+
+    const char *start = p ;
+    while ( *p && *p != ')' ) ++p ;
+
+    string s(start, p) ;
+    if ( !parse_coordinate_list(s, numbers) )
+        return false ;
+
+    ++p ;
+
+    return true ;
+}
+
+bool parse_transform(const string &str, Matrix2d &res)
+{
+
+    const char *p = str.c_str() ;
+    eat_white(p) ;
+
+    while ( *p ) {
+        vector<float> nums ;
+         if ( strncmp(p, "matrix", 6) == 0 ) {
+             p += 6 ;
+
+             if ( !parse_number_list(p, nums) ) return false ;
+
+             if ( nums.size() >= 6 ) {
+                 Matrix2d m(nums[0], nums[1], nums[2], nums[3], nums[4], nums[5]) ;
+                 res.premult(m) ;
+             }
+         }
+         else if ( strncmp(p, "translate", 9) == 0 ) {
+             p += 9 ;
+
+             if ( !parse_number_list(p, nums) ) return false ;
+
+             if ( nums.size() >= 2 )
+                 res.translate(nums[0], nums[1]) ;
+             else if ( nums.size() == 1 )
+                 res.translate(nums[0], 0.0) ;
+         }
+         else if ( strncmp(p, "rotate", 6) == 0 )  {
+             p += 6 ;
+
+             if ( !parse_number_list(p, nums) ) return false ;
+
+             if ( nums.size() == 1 )
+                 res.rotate(nums[0]) ;
+             else if ( nums.size() == 3 )
+                 res.rotate(nums[0], Point2d(nums[1], nums[2])) ;
+
+         }
+         else if ( strncmp(p, "scale", 5) == 0 )  {
+             p += 5 ;
+
+             if ( !parse_number_list(p, nums) ) return false ;
+
+             if ( nums.size() == 1 )
+                 res.scale(nums[0], nums[0]) ;
+             else if ( nums.size() >= 2 )
+                 res.scale(nums[0], nums[1]) ;
+         }
+         else if ( strncmp(p, "skewX", 5) == 0 ) {
+             p += 5 ;
+
+             if ( !parse_number_list(p, nums) ) return false ;
+
+             if ( nums.size() >= 1 )
+                 res.skew(nums[0], 0.0) ;
+         }
+         else if ( strncmp(p, "skewY", 5) == 0 ) {
+             p += 5 ;
+
+             if ( !parse_number_list(p, nums) ) return false ;
+
+             if ( nums.size() >= 1 )
+                 res.skew(0.0, nums[0]) ;
+         }
+
+         eat_white_comma(p) ;
+     }
+    return true ;
+}
 
 }

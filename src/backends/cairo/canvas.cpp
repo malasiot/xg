@@ -92,19 +92,12 @@ void Backend::cairo_apply_linear_gradient(const LinearGradientBrush &lg) {
 
     Matrix2d tr = lg.transform() ;
     cairo_matrix_init (&matrix, tr.m1(), tr.m2(), tr.m3(), tr.m4(), tr.m5(), tr.m6());
-
-    if ( lg.units() == ObjectBoundingBox ) {
-        cairo_matrix_t bboxmatrix;
-        cairo_matrix_init (&bboxmatrix, vbox_.maxX() - vbox_.minX(), 0, 0, vbox_.maxY() - vbox_.minY(), vbox_.minX(), vbox_.minY());
-        cairo_matrix_multiply (&matrix, &matrix, &bboxmatrix);
-    }
-
     cairo_matrix_invert (&matrix);
     cairo_pattern_set_matrix (pattern, &matrix);
 
-    if ( lg.spread() == ReflectSpread )
+    if ( lg.spread() == SpreadMethod::Reflect )
         cairo_pattern_set_extend (pattern, CAIRO_EXTEND_REFLECT);
-    else if ( lg.spread() == RepeatSpread )
+    else if ( lg.spread() == SpreadMethod::Repeat )
         cairo_pattern_set_extend (pattern, CAIRO_EXTEND_REPEAT);
     else
         cairo_pattern_set_extend (pattern, CAIRO_EXTEND_PAD);
@@ -129,20 +122,12 @@ void Backend::cairo_apply_radial_gradient(const RadialGradientBrush &rg) {
 
     Matrix2d tr = rg.transform() ;
     cairo_matrix_init (&matrix, tr.m1(), tr.m2(), tr.m3(), tr.m4(), tr.m5(), tr.m6());
-
-    if ( rg.units() == ObjectBoundingBox )
-    {
-        cairo_matrix_t bboxmatrix;
-        cairo_matrix_init (&bboxmatrix, vbox_.maxX() - vbox_.minX(), 0, 0, vbox_.maxY() - vbox_.minY(), vbox_.minX(), vbox_.minY());
-        cairo_matrix_multiply (&matrix, &matrix, &bboxmatrix);
-    }
-
     cairo_matrix_invert (&matrix);
     cairo_pattern_set_matrix (pattern, &matrix);
 
-    if ( rg.spread() == ReflectSpread )
+    if ( rg.spread() == SpreadMethod::Reflect )
         cairo_pattern_set_extend (pattern, CAIRO_EXTEND_REFLECT);
-    else if ( rg.spread() == RepeatSpread )
+    else if ( rg.spread() == SpreadMethod::Repeat )
         cairo_pattern_set_extend (pattern, CAIRO_EXTEND_REPEAT);
     else
         cairo_pattern_set_extend (pattern, CAIRO_EXTEND_PAD);

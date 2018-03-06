@@ -1,5 +1,6 @@
 #include "svg_dom.hpp"
 #include "svg_parse_util.hpp"
+#include "svg_href_resolver.hpp"
 
 #include <xg/util/strings.hpp>
 
@@ -8,10 +9,10 @@ using namespace std ;
 namespace xg {
 namespace svg {
 
-void SVGElement::parseAttributes(const xg::Dictionary &attrs) {
+void SVGElement::parseAttributes(const xg::Dictionary &attrs, HRefResolver &r) {
 
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     FitToViewBox::parseAttributes(attrs) ;
 
     parse_element_attribute("width", attrs, width_) ;
@@ -21,9 +22,15 @@ void SVGElement::parseAttributes(const xg::Dictionary &attrs) {
     parse_element_attribute("y", attrs, y_) ;
 }
 
-void Element::parseAttributes(const Dictionary &attrs) {
+void Element::parseAttributes(const Dictionary &attrs, HRefResolver &r) {
     id_ = attrs.get("id") ;
+    r.addElement(id_, this);
+
+    attrs.visit("xlink::href", [&](const string &v) {
+        r.addReference(this, v) ;
+    }) ;
 }
+
 
 void FitToViewBox::parseAttributes(const Dictionary &attrs) {
 
@@ -172,14 +179,14 @@ Matrix2d PreserveAspectRatio::getViewBoxTransform(double sw, double sh, double v
 
 }
 
-void Stylable::parseAttributes(const Dictionary &p) {
+void Stylable::parseAttributes(const Dictionary &p, HRefResolver &r) {
     for( const auto &lp: p ) {
         string key = lp.first, val = lp.second ;
 
         if ( key == "style" )
-            style_.fromStyleString(val) ;
+            style_.fromStyleString(val, r) ;
         else
-            style_.parseNameValue(key, val) ;
+            style_.parseNameValue(key, val, r) ;
     }
 
 }
@@ -192,151 +199,76 @@ void ViewBox::parse(const string &str) {
 }
 
 void Transformable::parseAttributes(const Dictionary &attrs) {
-    parse_element_attribute("transform", attrs, trans_) ;
+    attrs.visit("transform", [&](const string &v){
+        if ( !parse_transform(v, trans_) )
+            throw SVGDOMAttributeValueException("invalid transform");
+    }) ;
 }
 
-static void parse_number_list(const char *&p, vector<float> &numbers)
+
+
+
+void GradientElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    eat_white(p) ;
-    if ( *p++ != '(' )
-        throw SVGDOMAttributeValueException("invalid transform string") ;
-
-    const char *start = p ;
-    while ( *p && *p != ')' ) ++p ;
-
-    string s(start, p) ;
-    if ( !parse_coordinate_list(s, numbers) )
-        throw SVGDOMAttributeValueException("invalid transform string") ;
-
-    ++p ;
-
-}
-
-void Transform::parse(const string &str)
-{
-    const char *p = str.c_str() ;
-    eat_white(p) ;
-
-    while ( *p ) {
-        vector<float> nums ;
-         if ( strncmp(p, "matrix", 6) == 0 ) {
-             p += 6 ;
-
-             parse_number_list(p, nums) ;
-
-             if ( nums.size() >= 6 ) {
-                 Matrix2d m(nums[0], nums[1], nums[2], nums[3], nums[4], nums[5]) ;
-                 m_.premult(m) ;
-             }
-         }
-         else if ( strncmp(p, "translate", 9) == 0 ) {
-             p += 9 ;
-
-             parse_number_list(p, nums) ;
-
-             if ( nums.size() >= 2 )
-                 m_.translate(nums[0], nums[1]) ;
-             else if ( nums.size() == 1 )
-                 m_.translate(nums[0], 0.0) ;
-         }
-         else if ( strncmp(p, "rotate", 6) == 0 )  {
-             p += 6 ;
-
-             parse_number_list(p, nums) ;
-
-             if ( nums.size() == 1 )
-                 m_.rotate(nums[0]) ;
-             else if ( nums.size() == 3 )
-                 m_.rotate(nums[0], Point2d(nums[1], nums[2])) ;
-
-         }
-         else if ( strncmp(p, "scale", 5) == 0 )  {
-             p += 5 ;
-
-             parse_number_list(p, nums) ;
-
-             if ( nums.size() == 1 )
-                 m_.scale(nums[0], nums[0]) ;
-             else if ( nums.size() >= 2 )
-                 m_.scale(nums[0], nums[1]) ;
-         }
-         else if ( strncmp(p, "skewX", 5) == 0 ) {
-             p += 5 ;
-
-             parse_number_list(p, nums) ;
-
-             if ( nums.size() >= 1 )
-                 m_.skew(nums[0], 0.0) ;
-         }
-         else if ( strncmp(p, "skewY", 5) == 0 ) {
-             p += 5 ;
-
-             parse_number_list(p, nums) ;
-
-             if ( nums.size() >= 1 )
-                 m_.skew(0.0, nums[0]) ;
-         }
-
-         eat_white_comma(p) ;
-     }
-}
-
-void GradientElement::parseAttributes(const Dictionary &attrs)
-{
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
 
     for( const auto &lp: attrs ) {
         string key = lp.first, val = lp.second ;
 
         if ( key == "gradientUnits" ) {
             if ( val == "userSpaceOnUse" )
-                gradient_units_ = GradientUnits::UserSpaceOnUse ;
+                gradient_units_.assign(GradientUnits::UserSpaceOnUse) ;
             else if ( val == "objectBoundingBox" )
-                gradient_units_ = GradientUnits::ObjectBoundingBox ;
+                gradient_units_.assign(GradientUnits::ObjectBoundingBox) ;
         }
         else if ( key == "gradientTransform" ) {
-            trans_.parse(val) ;
+            Matrix2d t ;
+            if ( !parse_transform(val, t) )
+                throw SVGDOMAttributeValueException("invalid transform string") ;
+            trans_.assign(t) ;
         }
         else if ( key == "spreadMethod" ) {
             if ( val == "pad" )
-                spread_method_ = GradientSpreadMethod::Pad ;
+                spread_method_.assign(GradientSpreadMethod::Pad) ;
             else if ( val == "repeat" )
-                spread_method_ = GradientSpreadMethod::Repeat ;
+                spread_method_.assign(GradientSpreadMethod::Repeat) ;
             else if ( val == "reflect" )
-                spread_method_ = GradientSpreadMethod::Reflect ;
+                spread_method_.assign(GradientSpreadMethod::Reflect) ;
         }
-        else if ( key == "xlink:href" )
-            href_ = val ;
     }
 }
 
-void LinearGradientElement::parseAttributes(const Dictionary &attrs)
+void LinearGradientElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    GradientElement::parseAttributes(attrs) ;
+    GradientElement::parseAttributes(attrs, r) ;
 
-    parse_element_attribute("x1", attrs, x1_) ;
-    parse_element_attribute("x2", attrs, x2_) ;
-    parse_element_attribute("y1", attrs, y1_) ;
-    parse_element_attribute("y2", attrs, y2_) ;
+    parse_inheritable_attribute("x1", attrs, x1_) ;
+    parse_inheritable_attribute("x2", attrs, x2_) ;
+    parse_inheritable_attribute("y1", attrs, y1_) ;
+    parse_inheritable_attribute("y2", attrs, y2_) ;
 }
 
-void RadialGradientElement::parseAttributes(const Dictionary &attrs)
+void RadialGradientElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    GradientElement::parseAttributes(attrs) ;
+    GradientElement::parseAttributes(attrs, r) ;
 
     parse_element_attribute("cx", attrs, cx_) ;
     parse_element_attribute("cy", attrs, cy_) ;
+    parse_element_attribute("r", attrs, r_) ;
     parse_element_attribute("fx", attrs, fx_) ;
     parse_element_attribute("fy", attrs, fy_) ;
-    parse_element_attribute("r", attrs, r_) ;
+
+    if ( fx_.unknown() ) fx_ = cx_ ;
+    if ( fy_.unknown() ) fy_ = cy_ ;
+
 }
 
 
-void PatternElement::parseAttributes(const Dictionary &attrs)
+void PatternElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     FitToViewBox::parseAttributes(attrs) ;
 
     for( const auto &lp: attrs ) {
@@ -349,7 +281,8 @@ void PatternElement::parseAttributes(const Dictionary &attrs)
                 pattern_units_ = PatternUnits::ObjectBoundingBox ;
         }
         else if ( key == "patternTransform" ) {
-            trans_.parse(val) ;
+            if ( !parse_transform(val, trans_) )
+            throw SVGDOMAttributeValueException("invalid transform string") ;
         }
         else if ( key == "patternContentUnits" ) {
             if ( val == "userSpaceOnUse" )
@@ -357,8 +290,6 @@ void PatternElement::parseAttributes(const Dictionary &attrs)
             else if ( val == "objectBoundingBox" )
                 pattern_content_units_ = PatternUnits::ObjectBoundingBox ;
         }
-        else if ( key == "xlink:href" )
-            href_ = val ;
     }
 
     parse_element_attribute("x", attrs, x_) ;
@@ -367,18 +298,30 @@ void PatternElement::parseAttributes(const Dictionary &attrs)
     parse_element_attribute("height", attrs, height_) ;
 }
 
-void Stop::parseAttributes(const Dictionary &attrs) {
+void StopElement::parseAttributes(const Dictionary &attrs, HRefResolver &r) {
 
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
 
-    parse_element_attribute("offset", attrs, offset_) ;
+    string offset = attrs.get("offset") ;
+    if ( !offset.empty() ) {
+        Length l = Length::fromString(offset) ;
+        float perc ;
+        if ( l.units() == LengthUnitType::Number )
+            perc = l.value() ;
+        else if ( l.units() == LengthUnitType::Percentage )
+            perc = l.value() / 100.0 ;
+        else
+            throw SVGDOMAttributeValueException("invalid stop offset value") ;
+
+        offset_.assign(std::min<float>(std::max<float>(perc, 0.0), 1.0)) ;
+    }
 }
 
-void ImageElement::parseAttributes(const Dictionary &attrs)
+void ImageElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     Transformable::parseAttributes(attrs) ;
 
     parse_element_attribute("x", attrs, x_) ;
@@ -390,18 +333,18 @@ void ImageElement::parseAttributes(const Dictionary &attrs)
     parse_element_attribute("xlink::href", attrs, uri_) ;
 }
 
-void StyleElement::parseAttributes(const Dictionary &attrs) {
-    Element::parseAttributes(attrs) ;
+void StyleElement::parseAttributes(const Dictionary &attrs, HRefResolver &r) {
+    Element::parseAttributes(attrs, r) ;
 
     media_ = attrs.get("media") ;
     type_ = attrs.get("type") ;
     title_ = attrs.get("title") ;
 }
 
-void ClipPathElement::parseAttributes(const Dictionary &attrs)
+void ClipPathElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     Transformable::parseAttributes(attrs) ;
 
     attrs.visit("clipPathUnits", [&](const string &val) {
@@ -413,10 +356,10 @@ void ClipPathElement::parseAttributes(const Dictionary &attrs)
 
 }
 
-void UseElement::parseAttributes(const Dictionary &attrs)
+void UseElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     Transformable::parseAttributes(attrs) ;
 
     parse_element_attribute("x", attrs, x_) ;
@@ -424,36 +367,36 @@ void UseElement::parseAttributes(const Dictionary &attrs)
     parse_element_attribute("width", attrs, width_) ;
     parse_element_attribute("height", attrs, height_) ;
 
-    parse_element_attribute("xlink::href", attrs, uri_) ;
+ //   parse_element_attribute("xlink::href", attrs, uri_) ;
 }
 
-void GroupElement::parseAttributes(const Dictionary &attrs)
+void GroupElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     Transformable::parseAttributes(attrs) ;
 }
 
-void DefsElement::parseAttributes(const Dictionary &attrs)
+void DefsElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     Transformable::parseAttributes(attrs) ;
 }
 
-void PathElement::parseAttributes(const Dictionary &attrs)
+void PathElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     Transformable::parseAttributes(attrs) ;
 
     parse_element_attribute("d", attrs, path_) ;
 }
 
-void RectElement::parseAttributes(const Dictionary &attrs)
+void RectElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     Transformable::parseAttributes(attrs) ;
 
     parse_element_attribute("x", attrs, x_) ;
@@ -464,10 +407,10 @@ void RectElement::parseAttributes(const Dictionary &attrs)
     parse_element_attribute("rx", attrs, ry_) ;
 }
 
-void CircleElement::parseAttributes(const Dictionary &attrs)
+void CircleElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     Transformable::parseAttributes(attrs) ;
 
     parse_element_attribute("cx", attrs, cx_) ;
@@ -475,10 +418,10 @@ void CircleElement::parseAttributes(const Dictionary &attrs)
     parse_element_attribute("r", attrs, r_) ;
 }
 
-void EllipseElement::parseAttributes(const Dictionary &attrs)
+void EllipseElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     Transformable::parseAttributes(attrs) ;
 
     parse_element_attribute("cx", attrs, cx_) ;
@@ -487,10 +430,10 @@ void EllipseElement::parseAttributes(const Dictionary &attrs)
     parse_element_attribute("ry", attrs, ry_) ;
 }
 
-void LineElement::parseAttributes(const Dictionary &attrs)
+void LineElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     Transformable::parseAttributes(attrs) ;
 
     parse_element_attribute("x1", attrs, x1_) ;
@@ -499,19 +442,19 @@ void LineElement::parseAttributes(const Dictionary &attrs)
     parse_element_attribute("y2", attrs, y2_) ;
 }
 
-void PolylineElement::parseAttributes(const Dictionary &attrs)
+void PolylineElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     Transformable::parseAttributes(attrs) ;
 
     parse_element_attribute("points", attrs, points_) ;
 }
 
-void PolygonElement::parseAttributes(const Dictionary &attrs)
+void PolygonElement::parseAttributes(const Dictionary &attrs, HRefResolver &r)
 {
-    Element::parseAttributes(attrs) ;
-    Stylable::parseAttributes(attrs) ;
+    Element::parseAttributes(attrs, r) ;
+    Stylable::parseAttributes(attrs, r) ;
     Transformable::parseAttributes(attrs) ;
 
     parse_element_attribute("points", attrs, points_) ;
@@ -682,7 +625,7 @@ void PathData::parse(const string &str) {
 
 }
 
-void TextElement::parseAttributes(const Dictionary &a)
+void TextElement::parseAttributes(const Dictionary &a, HRefResolver &r)
 {
 
 }
@@ -713,6 +656,7 @@ void Visitor::visitChildren(Element *e)
 {
     for( auto c: e->children_ ) visit(c.get()) ;
 }
+
 
 
 }

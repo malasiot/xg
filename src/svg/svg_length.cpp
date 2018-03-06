@@ -70,6 +70,9 @@ static bool parse_units(char *&c, LengthUnitType &units) {
             return false ;
         }
         break ;
+    case '%':
+        units = LengthUnitType::Percentage ;
+        break ;
     }
 
     ++c ;

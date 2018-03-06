@@ -9,15 +9,18 @@ class Rectangle2d
 {
 protected:
 
-    double x_, y_, width_, height_ ;
+    double x_, y_, width_ = 0, height_ = 0 ;
+    bool empty_ ;
 
 public:
 
-    Rectangle2d(double x, double y, double w, double h): x_(x), y_(y), width_(w), height_(h) {
+    Rectangle2d(): empty_(true) {}
+
+    Rectangle2d(double x, double y, double w, double h): x_(x), y_(y), width_(w), height_(h), empty_(false) {
         normalize() ;
     }
 
-    Rectangle2d(const Vector2d &tl, const Vector2d &br) {
+    Rectangle2d(const Vector2d &tl, const Vector2d &br): empty_(false) {
         x_ = tl.x() ; y_ = tl.y() ;
         width_ = br.x() - x_ ;
         height_ = br.y() - y_ ;
@@ -39,6 +42,22 @@ public:
     double &x() { return x_ ; }
     double &y() { return y_ ; }
 
+    bool empty() const { return empty_ ; }
+
+    void extend(const Point2d &p) {
+        if ( empty_ ) {
+            x_ = p.x() ; y_ = p.y() ;
+            empty_ = false ;
+        } else {
+            double tlx = std::min(x_, p.x()) ;
+            double tly = std::min(y_, p.y()) ;
+            double brx = std::max(x_ + width_, p.x()) ;
+            double bry = std::max(y_ + width_, p.y()) ;
+
+            x_ = tlx ; y_ = tly ;
+            width_ = brx - tlx ; height_ = bry - tly ;
+        }
+    }
 
 
 private:

@@ -22,7 +22,7 @@ public:
       void pushTransform(const Matrix2d &) ;
       void popTransform() ;
 
-      void preRenderShape(const Style &s, const Matrix2d &tr) ;
+      void preRenderShape(const Style &s, const Matrix2d &tr, const Rectangle2d &rect) ;
       void setPaint() ;
       void postRenderShape() ;
 
@@ -73,7 +73,7 @@ protected:
       std::deque<Matrix2d> transforms_ ;
       std::deque<ViewBox> view_boxes_ ;
 
-      ViewBox obbox_  ;
+      Rectangle2d obbox_  ;
       RenderingMode rendering_mode_ ;
       std::map<std::string, ElementPtr> refs_ ;
       Matrix2d view2dev_ ;
