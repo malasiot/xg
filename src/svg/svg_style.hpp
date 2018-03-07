@@ -9,7 +9,6 @@
 
 #include "svg_length.hpp"
 
-
 #include <xg/util/variant.hpp>
 #include <xg/color.hpp>
 
@@ -64,17 +63,19 @@ struct FontSize {
     Length val_ ;
 };
 
+class URIReference ;
+
 struct Paint {
     Paint(PaintType t): type_(t) {}
 
     PaintType type_ ;
 
-    Variant<CSSColor, Element *> clr_or_server_id_ ;
+    Variant<CSSColor, std::string> clr_or_server_id_ ;
 } ;
 
 struct FillPaint: public Paint {
-    FillPaint(Element *e): Paint(PaintType::PaintServer) {
-        clr_or_server_id_.set<Element *>(e) ;
+    FillPaint(const std::string &id): Paint(PaintType::PaintServer) {
+        clr_or_server_id_.set<std::string>(id) ;
     }
     FillPaint(): Paint(PaintType::SolidColor) {
         clr_or_server_id_.set<CSSColor>(0, 0, 0) ;
@@ -82,8 +83,8 @@ struct FillPaint: public Paint {
 } ;
 
 struct StrokePaint: public Paint {
-    StrokePaint(Element *e): Paint(PaintType::PaintServer) {
-        clr_or_server_id_.set<Element *>(e) ;
+    StrokePaint(const std::string &id): Paint(PaintType::PaintServer) {
+        clr_or_server_id_.set<std::string>(id) ;
     }
     StrokePaint(): Paint(PaintType::None) {
     }
@@ -115,8 +116,10 @@ class Style
     CSSColor getStopColor() const { return findAttribute<CSSColor>(StyleAttributeType::StopColor, NamedColor::black()) ; }
     float getStopOpacity() const { return findAttribute<float>(StyleAttributeType::StopOpacity, 1.0) ; }
 
-    void parseNameValue(const std::string &name, const std::string &val, HRefResolver &) ;
-    void fromStyleString(const std::string &str, HRefResolver &) ;
+    OverflowType getOverflow() const { return findAttribute<OverflowType>(StyleAttributeType::Overflow, OverflowType::Visible) ; }
+
+    void parseNameValue(const std::string &name, const std::string &val, Element *) ;
+    void fromStyleString(const std::string &str, Element *) ;
 
     bool hasAttribute(StyleAttributeType f) const {
         return attributes_.find(f) != attributes_.end() ;
@@ -148,19 +151,14 @@ private:
     friend class HRefResolver ;
 
 
-    using attribute_value_t = Variant<float, std::string, Length, CSSColor, FillPaint, StrokePaint, dash_array_t, FillRule, LineJoinType, LineCapType,  FontStyle,
+    using attribute_value_t = Variant<bool, float, std::string, Length, CSSColor, FillPaint, StrokePaint, dash_array_t, FillRule, LineJoinType, LineCapType,  FontStyle,
         FontVariant, FontWeight, FontStretch, FontSize, TextDecoration, TextAnchor,
         ShapeQuality, TextQuality, DisplayMode, VisibilityMode, OverflowType>;
 
     std::map<StyleAttributeType, attribute_value_t> attributes_ ;
 
-    void parsePaint(const std::string &str, Paint &p, HRefResolver &r, bool fill_or_stroke)  ;
-    void setFillPaintServer(Element *e) {
-        setAttribute<FillPaint>(StyleAttributeType::Fill, FillPaint(e)) ;
-    }
-    void setStrokePaintServer(Element *e) {
-        setAttribute<StrokePaint>(StyleAttributeType::Stroke, StrokePaint(e)) ;
-    }
+    void parsePaint(const std::string &str, Paint &p, Element *r, bool fill_or_stroke)  ;
+
 
 } ;
 

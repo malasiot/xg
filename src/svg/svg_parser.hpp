@@ -6,20 +6,16 @@
 #include <iostream>
 
 #include "svg_dom.hpp"
-#include "svg_href_resolver.hpp"
 
 namespace xg {
 
 class SVGLoadException ;
 class SVGDocument ;
 
-namespace svg {
-class HRefResolver ;
-}
 
 class SVGParser {
 public:
-    SVGParser(SVGDocument &doc, svg::HRefResolver &res): document_(doc), resolver_(res) {}
+    SVGParser(SVGDocument &doc): document_(doc) {}
 
     void parseString(const std::string &xml) ;
     void parseStream(std::istream &strm, size_t buffer_sz = 1024) ;
@@ -27,9 +23,13 @@ protected:
 
 
     template <typename T>
-    std::shared_ptr<T> createNode(const Dictionary &a) {
+    std::shared_ptr<T> createNode(const Dictionary &a, bool is_root = false) {
         auto node = std::make_shared<T>() ;
-        node->parseAttributes(a, resolver_) ;
+        if ( is_root ) {
+            root_ = dynamic_cast<svg::SVGElement *>(node.get()) ;
+        }
+        node->setRoot(root_) ;
+
         auto ele = std::dynamic_pointer_cast<svg::Element>(node) ;
 
         if ( !nodes_.empty() ) {
@@ -37,6 +37,7 @@ protected:
             stack_node->addChild(ele) ;
         }
         nodes_.push_back(ele) ;
+        node->parseAttributes(a) ;
         return node ;
     }
 
@@ -57,7 +58,8 @@ private:
     SVGDocument &document_ ;
     std::deque<std::shared_ptr<svg::Element>> nodes_ ;
     std::deque<std::string> elements_ ;
-    svg::HRefResolver &resolver_ ;
+    svg::SVGElement *root_ = nullptr;
+
 };
 
 

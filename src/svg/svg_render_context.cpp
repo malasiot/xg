@@ -79,7 +79,12 @@ void RenderingContext::render(SVGElement &e) {
     canvas_.save() ;
     canvas_.setTransform(trs) ;
 
-    renderChildren(&e);
+    OverflowType ov = e.style_.getOverflow() ;
+
+    if ( ov == OverflowType::Scroll || ov == OverflowType::Hidden )
+        canvas_.setClipRect(xx, yy, sw, sh) ;
+
+    renderChildren(e);
 
     canvas_.restore() ;
 
@@ -113,25 +118,7 @@ void RenderingContext::popTransform() {
     transforms_.pop_back() ;
 }
 
-ElementPtr RenderingContext::lookupRef(const std::string &name) {
-    auto it = refs_.find(name) ;
-
-    if ( it == refs_.end() ) return nullptr ;
-    else return (*it).second ;
-}
-
-void RenderingContext::populateRefs(const ElementPtr &p) {
-    string id = p->id_ ;
-
-    if ( !id.empty() ) refs_['#' + id] = p ;
-
-    for( const auto el: p->children_ ) {
-        populateRefs(el) ;
-    }
-
-}
-
-void RenderingContext::preRenderShape(const Style &s, const Matrix2d &t, const Rectangle2d &bounds)
+void RenderingContext::preRenderShape(Element &e, const Style &s, const Matrix2d &t, const Rectangle2d &bounds)
 {
     pushState(s) ;
     pushTransform(t) ;
@@ -146,11 +133,11 @@ void RenderingContext::preRenderShape(const Style &s, const Matrix2d &t, const R
     if ( rendering_mode_ == RenderingMode::Display ) {
         string cp_id = st.getClipPath() ;
         if ( !cp_id.empty() ) {
-            ElementPtr p = lookupRef(cp_id) ;
+            Element *p = e.root().resolve(cp_id) ;
 
             if ( p ) {
-                auto e = std::dynamic_pointer_cast<ClipPathElement>(p) ;
-                if ( e ) applyClipPath(e.get()) ;
+                auto e = dynamic_cast<ClipPathElement *>(p) ;
+                if ( e ) applyClipPath(e) ;
             }
         }
     }
@@ -174,8 +161,8 @@ void RenderingContext::setLinearGradientBrush(LinearGradientElement &e, float a)
 {
     Length x1 = e.x1(), y1 = e.y1(), x2 = e.x2(), y2 = e.y2() ;
 
-    GradientSpreadMethod sm = e.spread_method_.value() ;
-    GradientUnits gu = e.gradient_units_.value() ;
+    GradientSpreadMethod sm = e.spreadMethod() ;
+    GradientUnits gu = e.gradientUnits() ;
 
     double ix1, iy1, ix2, iy2 ;
 
@@ -189,9 +176,9 @@ void RenderingContext::setLinearGradientBrush(LinearGradientElement &e, float a)
                 y2.value() : toPixels(y2, LengthDirection::Vertical) ;
 
     ix2 = ( gu == GradientUnits::ObjectBoundingBox ) ?
-                x2.value() : toPixels(ctx, LengthDirection::Horizontal) ;
+                x2.value() : toPixels(x2, LengthDirection::Horizontal) ;
 
-    Matrix2d gtrans = e.trans_.value() ;
+    Matrix2d gtrans = e.gradientTransform() ;
 
     if ( gu == GradientUnits::ObjectBoundingBox ) {
         Matrix2d obbm ;
@@ -214,16 +201,15 @@ void RenderingContext::setLinearGradientBrush(LinearGradientElement &e, float a)
 
     float gopac = states_.back().getOpacity() ;
 
-    for( const auto &c: e.children_ ) {
-        auto p = dynamic_cast<StopElement *>(c.get()) ;
-        if ( p ) {
-           const CSSColor &stop_clr = p->style_.getStopColor() ;
-           float stop_opacity =  p->style_.getStopOpacity() ;
-           float offset = p->offset_.value() ;
+    vector<StopElement *> stop_elements ;
+    e.collectStops(stop_elements);
 
-           brush.addStop(offset, Color(stop_clr, stop_opacity * a * gopac)) ;
-        }
+    for( const StopElement *p: stop_elements ) {
+        const CSSColor &stop_clr = p->style_.getStopColor() ;
+        float stop_opacity =  p->style_.getStopOpacity() ;
+        float offset = p->offset_.value() ;
 
+        brush.addStop(offset, Color(stop_clr, stop_opacity * a * gopac)) ;
     }
 
     canvas_.setBrush(brush) ;
@@ -233,12 +219,11 @@ void RenderingContext::setRadialGradientBrush(RadialGradientElement &e, float a)
 {
     double ifx, ify, icx, icy, ir ;
 
-    Length cx = e.cx_, cy = e.cy_, fx = e.fx_, fy = e.fy_, r = e.r_ ;
+    Length cx = e.cx(), cy = e.cy(), fx = e.fx(), fy = e.fy(), r = e.r() ;
 
-    GradientSpreadMethod sm = e.spread_method_.value() ;
-    GradientUnits gu = e.gradient_units_.value() ;
+    GradientSpreadMethod sm = e.spreadMethod() ;
+    GradientUnits gu = e.gradientUnits() ;
 
-    double ix1, iy1, ix2, iy2 ;
 
     icx = ( gu == GradientUnits::ObjectBoundingBox ) ?
                 cx.value() : toPixels(cx, LengthDirection::Horizontal) ;
@@ -255,7 +240,7 @@ void RenderingContext::setRadialGradientBrush(RadialGradientElement &e, float a)
     ir = ( gu == GradientUnits::ObjectBoundingBox ) ?
                 r.value() : toPixels(r, LengthDirection::Absolute) ;
 
-    Matrix2d gtrans = e.trans_.value() ;
+    Matrix2d gtrans = e.gradientTransform() ;
 
     if ( gu == GradientUnits::ObjectBoundingBox ) {
         Matrix2d obbm ;
@@ -278,15 +263,15 @@ void RenderingContext::setRadialGradientBrush(RadialGradientElement &e, float a)
 
     float gopac = states_.back().getOpacity() ;
 
-    for( const auto &c: e.children_ ) {
-        auto p = dynamic_cast<StopElement *>(c.get()) ;
-        if ( p ) {
-           const CSSColor &stop_clr = p->style_.getStopColor() ;
-           float stop_opacity =  p->style_.getStopOpacity() ;
-           float offset = p->offset_.value() ;
+    vector<StopElement *> stop_elements ;
+    e.collectStops(stop_elements);
 
-           brush.addStop(offset, Color(stop_clr, stop_opacity * a * gopac)) ;
-        }
+    for( const StopElement *p: stop_elements ) {
+        const CSSColor &stop_clr = p->style_.getStopColor() ;
+        float stop_opacity =  p->style_.getStopOpacity() ;
+        float offset = p->offset_.value() ;
+
+        brush.addStop(offset, Color(stop_clr, stop_opacity * a * gopac)) ;
     }
 
     canvas_.setBrush(brush) ;
@@ -296,9 +281,111 @@ void RenderingContext::setRadialGradientBrush(RadialGradientElement &e, float a)
 void RenderingContext::setPatternBrush(PatternElement &e, float a)
 {
 
+    double ipw, iph, ipx, ipy ;
+
+    Length px = e.x(), py = e.y(), pw = e.width(), ph = e.height() ;
+    PatternUnits pu = e.patternUnits(), pcu = e.patternContentUnits() ;
+    Matrix2d trans = e.patternTransform() ;
+
+    ipw = ( pu == PatternUnits::UserSpaceOnUse ) ? pw.value() : toPixels(pw, LengthDirection::Horizontal) ;
+    iph = ( pu == PatternUnits::UserSpaceOnUse ) ? ph.value() : toPixels(ph, LengthDirection::Vertical) ;
+    ipx = ( pu == PatternUnits::UserSpaceOnUse ) ? px.value() : toPixels(px, LengthDirection::Horizontal) ;
+    ipy = ( pu == PatternUnits::UserSpaceOnUse ) ? py.value() : toPixels(py, LengthDirection::Vertical) ;
+
+    double bbwscale, bbhscale, scwscale, schscale;
+
+    int pbw, pbh;
+    cairo_matrix_t affine, caffine, taffine ;
+
+
+#if 0
+    if (pat->pattern_units_ == Pattern::ObjectBoundingBox)
+    {
+        bbwscale = ctx->obbox.w;
+        bbhscale = ctx->obbox.h;
+    }
+    else {
+        bbwscale = 1.0;
+        bbhscale = 1.0;
+    }
+
+    cairo_matrix_init_identity(&affine) ;
+    cairo_matrix_init_identity(&caffine) ;
+
+    Transform &trs = ctx->transforms.back() ;
+    cairo_matrix_t patm;
+    cairo_matrix_init(&patm, pat->trans_.m_[0], pat->trans_.m_[1], pat->trans_.m_[2], pat->trans_.m_[3],
+            pat->trans_.m_[4], pat->trans_.m_[5]) ;
+    //cairo_get_matrix(ctx->cr, &trsm) ;
+
+    cairo_matrix_multiply(&taffine, &patm, &caffine) ;
+
+    scwscale = sqrt (taffine.xx * taffine.xx + taffine.xy * taffine.xy);
+    schscale = sqrt (taffine.yx * taffine.yx + taffine.yy * taffine.yy);
+
+    pbw = ipw * bbwscale * scwscale;
+    pbh = iph * bbhscale * schscale;
+
+    scwscale = (double) pbw / (double) (ipw * bbwscale);
+    schscale = (double) pbh / (double) (iph * bbhscale);
+
+    cairo_surface_t *surface = cairo_surface_create_similar (cairo_get_target (cr),
+                                                             CAIRO_CONTENT_COLOR_ALPHA, pbw, pbh);
+    cr_pattern = cairo_create (surface);
+
+    if (pat->pattern_units_ == Pattern::ObjectBoundingBox) {
+        /* subtract the pattern origin */
+        affine.x0 = ctx->obbox.x + ipx * ctx->obbox.w;
+        affine.y0 = ctx->obbox.y + ipy * ctx->obbox.h;
+    } else {
+        /* subtract the pattern origin */
+        affine.x0 = ipx;
+        affine.y0 = ipy;
+    }
+
+    cairo_matrix_multiply(&affine, &affine, &patm) ;
+
+    double sw = ipw * bbwscale;
+    double sh = iph * bbhscale;
+
+    Transform prs ;
+
+    if ( pat->view_box_.w == 0 ) pat->view_box_.w = sw ;
+    if ( pat->view_box_.h == 0 ) pat->view_box_.h = sh ;
+
+    if ( pat->view_box_.w != 0.0 && pat->view_box_.h != 0.0 )
+    {
+        ViewBox vbox = pat->view_box_ ;
+
+        double ofx = 0, ofy = 0 ;
+        double aspScaleX = 1.0 ;
+        double aspScaleY = 1.0 ;
+
+        if ( pat->preserve_aspect_ratio_.view_box_align_ != PreserveAspectRatio::NoViewBoxAlign )
+        {
+            pat->preserve_aspect_ratio_.constrainViewBox(sw, sh, vbox) ;
+
+            aspScaleX = vbox.w/pat->view_box_.w ;
+            aspScaleY = vbox.h/pat->view_box_.h ;
+
+            ofx = vbox.x;
+            ofy = vbox.y ;
+        }
+        else {
+            aspScaleX = sw/vbox.w ;
+            aspScaleY = sh/vbox.h ;
+
+        }
+
+        prs = Transform::translation(-ipx, -ipy) ;
+        prs = Transform::multiply(prs, Transform::scaling(aspScaleX, aspScaleY)) ;
+        prs = Transform::multiply(prs, Transform::translation(ofx , ofy)) ;
+
+    }
+#endif
 }
 
-void RenderingContext::setPaint()
+void RenderingContext::setPaint(Element &e)
 {
     Style &st = states_.back() ;
 
@@ -377,8 +464,9 @@ void RenderingContext::setPaint()
         canvas_.setBrush(SolidBrush(clr)) ;
     }
     else if ( fill_paint.type_ == PaintType::PaintServer ) {
-     //  ElementPtr elem = lookupRef(fill_paint.clr_or_server_id_.get<std::string>()) ;
-        Element *elem = fill_paint.clr_or_server_id_.get<Element *>() ;
+
+        string ps_id = fill_paint.clr_or_server_id_.get<string>() ;
+        Element *elem = e.root().resolve(ps_id) ;
 
         float fill_opacity = st.getFillOpacity() ;
 
@@ -429,16 +517,14 @@ void RenderingContext::render(PolylineElement &)
 }
 
 void RenderingContext::render(PathElement &e) {
-    preRenderShape(e.style_, e.trans_, Rectangle2d()) ;
-    setPaint() ;
+    preRenderShape(e, e.style_, e.trans_, Rectangle2d()) ;
+    setPaint(e) ;
     canvas_.drawPath(e.path_.path_) ;
     postRenderShape() ;
 }
 
 void RenderingContext::render(RectElement &rect)
 {
-
-
     double rxp = toPixels(rect.rx_, LengthDirection::Horizontal) ;
     double ryp = toPixels(rect.ry_, LengthDirection::Vertical) ;
     double xp = toPixels(rect.x_, LengthDirection::Horizontal) ;
@@ -452,9 +538,8 @@ void RenderingContext::render(RectElement &rect)
     if (rxp == 0) rxp = ryp;
     else if (ryp == 0) ryp = rxp ;
 
-    preRenderShape(rect.style_, rect.trans_, Rectangle2d(xp, yp, wp, hp)) ;
-    setPaint() ;
-
+    preRenderShape(rect, rect.style_, rect.trans_, Rectangle2d(xp, yp, wp, hp)) ;
+    setPaint(rect) ;
 
     canvas_.drawPath(Path().addRoundedRect(xp, yp, wp, hp, rxp, ryp)) ;
 
@@ -481,9 +566,9 @@ void RenderingContext::render(TextSpanElement &)
 
 }
 
-void RenderingContext::renderChildren(const Element *e)
+void RenderingContext::renderChildren(const Element &e)
 {
-    for( const auto c: e->children_ ) {
+    for( const auto c: e.children() ) {
         if ( auto p = std::dynamic_pointer_cast<SVGElement>(c) ) render(*p) ;
         else if ( auto p = std::dynamic_pointer_cast<RectElement>(c) ) render(*p) ;
         else if ( auto p = std::dynamic_pointer_cast<PathElement>(c) ) render(*p) ;
@@ -506,10 +591,9 @@ void RenderingContext::render(SymbolElement &)
 }
 
 void RenderingContext::render(GroupElement &g) {
-     preRenderShape(g.style_, g.trans_, Rectangle2d()) ;
-     renderChildren(&g) ;
+     preRenderShape(g, g.style_, g.trans_, Rectangle2d()) ;
+     renderChildren(g) ;
      postRenderShape() ;
-
 }
 
 void RenderingContext::render(UseElement &)

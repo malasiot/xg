@@ -1,7 +1,6 @@
 #include "svg_style.hpp"
 #include "svg_parse_util.hpp"
 #include "svg_dom_exceptions.hpp"
-#include "svg_href_resolver.hpp"
 
 #include <xg/util/strings.hpp>
 
@@ -11,7 +10,7 @@ namespace xg {
 namespace svg {
 
 
-void Style::parsePaint(const std::string &val, Paint &p, HRefResolver &r, bool fill)
+void Style::parsePaint(const std::string &val, Paint &p, Element *r, bool fill)
 {
     if ( val == "none" )
         p.type_ = PaintType::None ;
@@ -21,8 +20,7 @@ void Style::parsePaint(const std::string &val, Paint &p, HRefResolver &r, bool f
         string id = parse_uri(val) ;
 
         if ( !id.empty() ) {
-            r.addPaintReference(this, id, fill) ;
-       //     p.clr_or_server_id_.set<string>(id) ;
+            p.clr_or_server_id_.set<string>(id) ;
             p.type_ = PaintType::PaintServer ;
         }
         else throw SVGDOMAttributeValueException("invalid paint url") ;
@@ -41,7 +39,7 @@ void Style::parsePaint(const std::string &val, Paint &p, HRefResolver &r, bool f
     }
 }
 
-void Style::parseNameValue(const string &name, const string &value, HRefResolver &r) {
+void Style::parseNameValue(const string &name, const string &value, Element *e) {
     string val = trimCopy(value) ;
 
     if ( val == "inherit" ) return ;
@@ -71,13 +69,13 @@ void Style::parseNameValue(const string &name, const string &value, HRefResolver
     else if ( name == "clip-rule" ) ;
     else if ( name == "fill") {
         FillPaint p ;
-        parsePaint(val, p, r, true) ;
+        parsePaint(val, p, e, true) ;
         setAttribute<FillPaint>(StyleAttributeType::Fill, p) ;
     }
     else if ( name == "stroke" )
     {
         StrokePaint p ;
-        parsePaint(val, p, r, false) ;
+        parsePaint(val, p, e, false) ;
         setAttribute<StrokePaint>(StyleAttributeType::Stroke, p) ;
     }
     else if ( name == "stroke-width" ) {
@@ -290,13 +288,13 @@ void Style::parseNameValue(const string &name, const string &value, HRefResolver
 
 }
 
-void Style::fromStyleString(const string &str, HRefResolver &r) {
+void Style::fromStyleString(const string &str, Element *c) {
     static regex sr("([a-zA-Z-]+)[\\s]*:[\\s]*([^:;]+)[\\s]*[;]?") ;
 
     sregex_iterator it(str.begin(), str.end(), sr), end ;
 
     while ( it != end )  {
-        parseNameValue(it->str(1), it->str(2), r) ;
+        parseNameValue(it->str(1), it->str(2), c) ;
         ++it ;
     }
 }

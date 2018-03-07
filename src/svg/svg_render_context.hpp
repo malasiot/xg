@@ -22,8 +22,8 @@ public:
       void pushTransform(const Matrix2d &) ;
       void popTransform() ;
 
-      void preRenderShape(const Style &s, const Matrix2d &tr, const Rectangle2d &rect) ;
-      void setPaint() ;
+      void preRenderShape(Element &e, const Style &s, const Matrix2d &tr, const Rectangle2d &rect) ;
+      void setPaint(Element &e) ;
       void postRenderShape() ;
 
       void applyClipPath(ClipPathElement *e) ;
@@ -54,13 +54,10 @@ public:
      // void visit(ClipPathElement &) override ;
       void render(ImageElement &) ;
       void render(TextElement &) ;
-      //void render(LinearGradientElement &) ;
-      //void visit(RadialGradientElement &) override ;
-      //void visit(PatternElement &) override ;
       void render(TextSpanElement &) ;
       //void visit(StyleElement &) override ;
 
-      void renderChildren(const Element *e) ;
+      void renderChildren(const Element &e) ;
 
       void setShapeAntialias(ShapeQuality aa);
       void setLinearGradientBrush(LinearGradientElement &e, float a) ;

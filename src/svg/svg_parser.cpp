@@ -62,13 +62,9 @@ void SVGParser::beginElement(const string &name, const Dictionary &attributes) {
 
     elements_.push_back(name) ;
 
-   for( const auto &s: elements_ )
-       cout << "<" << s << "> " ;
-   cout << endl ;
-
     if ( name == "svg" ) {
         bool is_root = nodes_.empty() ;
-        auto node = createNode<svg::SVGElement>(attributes) ;
+        auto node = createNode<svg::SVGElement>(attributes, is_root) ;
         if ( is_root ) document_.root_ = node ;
     }
     else if ( name == "g" )
