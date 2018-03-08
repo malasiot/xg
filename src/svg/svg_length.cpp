@@ -9,7 +9,7 @@ static bool parse_units(char *&c, LengthUnitType &units) {
     switch ( *c ) {
     case 0:
         units = LengthUnitType::Number ;
-        break ;
+        return true ;
     case 'e':
         c ++ ;
         switch ( *c ) {
@@ -121,7 +121,7 @@ std::vector<Length> Length::parseList(const string &str)
     }
 
 
-    LengthUnitType unit_type = LengthUnitType::Unknown ;
+    LengthUnitType unit_type = LengthUnitType::Number ;
 
     if ( ! parse_units(c_end, unit_type) ) {
         throw SVGDOMAttributeValueException("invalid units") ;
@@ -129,7 +129,9 @@ std::vector<Length> Length::parseList(const string &str)
 
     vl.emplace_back(value, unit_type) ;
 
-    while ( isspace(*c_end) || *c_end == ',' ) ++c_end ;
+    while ( *c_end && ( isspace(*c_end) || *c_end == ',' ) ) ++c_end ;
+
+    c_start = c_end ;
     } while ( *c_end != 0 ) ;
 
     return vl ;

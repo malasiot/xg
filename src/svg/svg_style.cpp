@@ -56,6 +56,12 @@ void Style::parseNameValue(const string &name, const string &value, Element *e) 
             setAttribute<float>(StyleAttributeType::FillOpacity, v) ;
 
     }
+    else if ( name == "stroke-opacity" )  {
+        float v ;
+        if ( parse_number(val, v) )
+            setAttribute<float>(StyleAttributeType::StrokeOpacity, v) ;
+
+    }
     else if ( name == "opacity" )  {
         float v ;
         if ( parse_number(val, v) )

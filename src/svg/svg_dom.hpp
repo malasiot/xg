@@ -201,16 +201,16 @@ ClipPathElement, ImageElement, PatternElement, StyleElement, TextElement> ;
 using ShapeContainer = Container<CircleElement, LineElement, PolylineElement, PolygonElement, RectElement, PathElement, EllipseElement, UseElement, TextElement> ;
 
 template<typename S>
-class Attribute {
+class OptionalAttribute {
 public:
 
     typedef S type ;
 
     // set default value
-    Attribute(const S &def): default_(def) {}
+    OptionalAttribute(const S &def): default_(def) {}
 
-    Attribute(const Attribute<S> &) = delete ;
-    Attribute &operator = ( const Attribute<S> &) = delete ;
+    OptionalAttribute(const OptionalAttribute<S> &) = delete ;
+    OptionalAttribute &operator = ( const OptionalAttribute<S> &) = delete ;
 
     S value() const { return ( has_value_ ) ? value_ : default_ ; }
     void assign(const S &val) { value_ = val ; has_value_ = true ; }
@@ -242,7 +242,7 @@ public:
 
     void parseAttributes(const Dictionary &p) ;
 
-    Attribute<float> offset_{0.0} ;
+    OptionalAttribute<float> offset_{0.0} ;
 } ;
 
 
@@ -265,9 +265,9 @@ public:
 protected:
 
 
-    Attribute<GradientSpreadMethod> spread_method_ ;
-    Attribute<GradientUnits> gradient_units_ ;
-    Attribute<Matrix2d> trans_ ;
+    OptionalAttribute<GradientSpreadMethod> spread_method_ ;
+    OptionalAttribute<GradientUnits> gradient_units_ ;
+    OptionalAttribute<Matrix2d> trans_ ;
     std::string href_ ;
 
 } ;
@@ -284,7 +284,7 @@ public:
     Length x2() ;
     Length y2() ;
 
-    Attribute<Length> x1_{0.0_perc}, y1_{0.0_perc}, x2_{1.0_perc}, y2_{0.0_perc} ;
+    OptionalAttribute<Length> x1_{0.0_perc}, y1_{0.0_perc}, x2_{1.0_perc}, y2_{0.0_perc} ;
 } ;
 
 class RadialGradientElement: public GradientElement {
@@ -300,7 +300,7 @@ public:
     Length fy() ;
     Length r() ;
 
-    Attribute<Length> cx_{0.5_perc}, cy_{0.5_perc}, r_{0.5_perc}, fx_{0}, fy_{0} ;
+    OptionalAttribute<Length> cx_{0.5_perc}, cy_{0.5_perc}, r_{0.5_perc}, fx_{0}, fy_{0} ;
 } ;
 
 enum class PatternUnits { UserSpaceOnUse, ObjectBoundingBox } ;
@@ -332,12 +332,12 @@ public:
 
 protected:
 
-    Attribute<PatternUnits> pattern_units_{PatternUnits::ObjectBoundingBox} ;
-    Attribute<PatternUnits> pattern_content_units_{PatternUnits::UserSpaceOnUse} ;
-    Attribute<Matrix2d> trans_{Matrix2d()} ;
-    Attribute<Length> x_{0}, y_{0}, width_{0}, height_{0} ;
-    Attribute<ViewBox> view_box_{ViewBox()} ;
-    Attribute<PreserveAspectRatio> preserve_aspect_ratio_{PreserveAspectRatio()} ;
+    OptionalAttribute<PatternUnits> pattern_units_{PatternUnits::ObjectBoundingBox} ;
+    OptionalAttribute<PatternUnits> pattern_content_units_{PatternUnits::UserSpaceOnUse} ;
+    OptionalAttribute<Matrix2d> trans_{Matrix2d()} ;
+    OptionalAttribute<Length> x_{0}, y_{0}, width_{0}, height_{0} ;
+    OptionalAttribute<ViewBox> view_box_{ViewBox()} ;
+    OptionalAttribute<PreserveAspectRatio> preserve_aspect_ratio_{PreserveAspectRatio()} ;
 
     std::string href_ ;
 } ;
@@ -380,7 +380,7 @@ public:
     void parseAttributes(const Dictionary &a)  ;
 
     Length x_{0}, y_{0}, width_, height_ ;
-    URI uri_ ;
+    std::string href_ ;
 } ;
 
 
@@ -522,7 +522,7 @@ inline void parseAttribute(const char *name, const Dictionary &attr, T &t) {
 }
 
 template<typename T>
-inline void parseOptionalAttribute(const char *name, const Dictionary &attr, Attribute<T> &t) {
+inline void parseOptionalAttribute(const char *name, const Dictionary &attr, OptionalAttribute<T> &t) {
 
     std::string value = attr.get(name) ;
     try {

@@ -26,8 +26,12 @@ public:
         return { 1.0, 0.0, 0.0, 1.0, 0.0, 0.0 } ;
     }
 
+    static Matrix2d translation(double x, double y) {
+        return { 1.0, 0.0, 0.0, 1.0, x, y } ;
+    }
+
     static Matrix2d translation(const Vector2d &v) {
-        return { 1.0, 0.0, 0.0, 1.0, v.x(), v.y() } ;
+        return translation(v.x(), v.y()) ;
     }
 
     static Matrix2d rotation(double radians) {
@@ -44,6 +48,10 @@ public:
 
     static Matrix2d scaling(double sx, double sy) {
         return { sx, 0, 0, sy, 0.0, 0.0 } ;
+    }
+
+    static Matrix2d skewing(double sx, double sy) {
+        return { 1, sx, sy, 1, 0.0, 0.0 } ;
     }
 
     Matrix2d& translate(double tx, double ty) {

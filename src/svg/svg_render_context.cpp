@@ -566,8 +566,36 @@ void RenderingContext::render(GroupElement &g) {
      postRenderShape() ;
 }
 
-void RenderingContext::render(UseElement &)
+void RenderingContext::render(UseElement &e)
 {
+    Element * eref  = e.root().resolve(e.href_) ;
+    if ( !eref ) return ;
+
+    float xx = toPixels(e.x_, LengthDirection::Horizontal) ;
+    float yy = toPixels(e.y_, LengthDirection::Vertical) ;
+    float sw = toPixels(e.width_, LengthDirection::Horizontal) ;
+    float sh = toPixels(e.height_, LengthDirection::Vertical) ;
+
+    Matrix2d trc = Matrix2d::translation(xx, yy), trans = e.trans_ ;
+
+    trc.premult(trans) ;
+
+    pushState(e.style_) ;
+    pushTransform(trc) ;
+
+    canvas_.save() ;
+    canvas_.setTransform(trc) ;
+
+    if ( auto symbol = dynamic_cast<SymbolElement *>(eref) )  {
+
+    }
+    else
+       render(eref) ;
+
+    canvas_.restore() ;
+
+    popTransform() ;
+    popState() ;
 
 }
 

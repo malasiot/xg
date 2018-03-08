@@ -540,8 +540,8 @@ void UseElement::parseAttributes(const Dictionary &attrs)
     parseAttribute("width", attrs, width_) ;
     parseAttribute("height", attrs, height_) ;
 
- //   parseAttribute("xlink::href", attrs, uri_) ;
-}
+    href_ = attrs.get("xlink:href") ;
+ }
 
 void GroupElement::parseAttributes(const Dictionary &attrs)
 {

@@ -154,9 +154,10 @@ bool parse_transform(const string &str, Matrix2d &res)
              if ( !parse_number_list(p, nums) ) return false ;
 
              if ( nums.size() >= 2 )
-                 res.translate(nums[0], nums[1]) ;
+                 //res.translate(nums[0], nums[1]) ;
+                 res.premult(Matrix2d::translation(nums[0], nums[1])) ;
              else if ( nums.size() == 1 )
-                 res.translate(nums[0], 0.0) ;
+                 res.premult(Matrix2d::translation(nums[0], 0.0)) ;
          }
          else if ( strncmp(p, "rotate", 6) == 0 )  {
              p += 6 ;
@@ -164,9 +165,9 @@ bool parse_transform(const string &str, Matrix2d &res)
              if ( !parse_number_list(p, nums) ) return false ;
 
              if ( nums.size() == 1 )
-                 res.rotate(nums[0] * M_PI / 180.0) ;
+                 res.premult(Matrix2d::rotation(nums[0] * M_PI/180.0)) ;
              else if ( nums.size() == 3 )
-                 res.rotate(nums[0] * M_PI / 180.0, Point2d(nums[1], nums[2])) ;
+                 res.premult(Matrix2d::rotation(nums[0] * M_PI / 180.0, Point2d(nums[1], nums[2]))) ;
 
          }
          else if ( strncmp(p, "scale", 5) == 0 )  {
@@ -175,9 +176,9 @@ bool parse_transform(const string &str, Matrix2d &res)
              if ( !parse_number_list(p, nums) ) return false ;
 
              if ( nums.size() == 1 )
-                 res.scale(nums[0], nums[0]) ;
+                 res.premult(Matrix2d::scaling(nums[0], nums[0])) ;
              else if ( nums.size() >= 2 )
-                 res.scale(nums[0], nums[1]) ;
+                 res.premult(Matrix2d::scaling(nums[0], nums[1])) ;
          }
          else if ( strncmp(p, "skewX", 5) == 0 ) {
              p += 5 ;
@@ -185,7 +186,7 @@ bool parse_transform(const string &str, Matrix2d &res)
              if ( !parse_number_list(p, nums) ) return false ;
 
              if ( nums.size() >= 1 )
-                 res.skew(nums[0], 0.0) ;
+                 res.premult(Matrix2d::skewing(nums[0], 0.0)) ;
          }
          else if ( strncmp(p, "skewY", 5) == 0 ) {
              p += 5 ;
@@ -193,7 +194,7 @@ bool parse_transform(const string &str, Matrix2d &res)
              if ( !parse_number_list(p, nums) ) return false ;
 
              if ( nums.size() >= 1 )
-                 res.skew(0.0, nums[0]) ;
+                 res.premult(Matrix2d::skewing(0, nums[0])) ;
          }
 
          eat_white_comma(p) ;
