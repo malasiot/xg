@@ -280,109 +280,54 @@ void RenderingContext::setRadialGradientBrush(RadialGradientElement &e, float a)
 
 void RenderingContext::setPatternBrush(PatternElement &e, float a)
 {
-
-    double ipw, iph, ipx, ipy ;
-
     Length px = e.x(), py = e.y(), pw = e.width(), ph = e.height() ;
     PatternUnits pu = e.patternUnits(), pcu = e.patternContentUnits() ;
     Matrix2d trans = e.patternTransform() ;
 
-    ipw = ( pu == PatternUnits::UserSpaceOnUse ) ? pw.value() : toPixels(pw, LengthDirection::Horizontal) ;
-    iph = ( pu == PatternUnits::UserSpaceOnUse ) ? ph.value() : toPixels(ph, LengthDirection::Vertical) ;
-    ipx = ( pu == PatternUnits::UserSpaceOnUse ) ? px.value() : toPixels(px, LengthDirection::Horizontal) ;
-    ipy = ( pu == PatternUnits::UserSpaceOnUse ) ? py.value() : toPixels(py, LengthDirection::Vertical) ;
+    double tile_w = ( pu == PatternUnits::ObjectBoundingBox ) ? pw.value() * obbox_.width() : toPixels(pw, LengthDirection::Horizontal) ;
+    double tile_h = ( pu == PatternUnits::ObjectBoundingBox ) ? ph.value() * obbox_.height(): toPixels(ph, LengthDirection::Vertical) ;
+    double tile_x = ( pu == PatternUnits::ObjectBoundingBox ) ? px.value() * obbox_.x() : toPixels(px, LengthDirection::Horizontal) ;
+    double tile_y = ( pu == PatternUnits::ObjectBoundingBox ) ? py.value() * obbox_.y() : toPixels(py, LengthDirection::Vertical) ;
 
-    double bbwscale, bbhscale, scwscale, schscale;
+    Matrix2d tile_transform, pattern_transform ;
 
-    int pbw, pbh;
-    cairo_matrix_t affine, caffine, taffine ;
-
-
-#if 0
-    if (pat->pattern_units_ == Pattern::ObjectBoundingBox)
-    {
-        bbwscale = ctx->obbox.w;
-        bbhscale = ctx->obbox.h;
+    if ( e.hasViewBox() ) {
+        ViewBox vbox = e.viewBox() ;
+        tile_transform = e.preserveAspectRatio().getViewBoxTransform(tile_w, tile_h, vbox.width_, vbox.height_, vbox.x_, vbox.y_) ;
     }
     else {
-        bbwscale = 1.0;
-        bbhscale = 1.0;
+
+        if ( pcu == PatternUnits::ObjectBoundingBox )
+            tile_transform.scale(obbox_.width(), obbox_.height());
     }
 
-    cairo_matrix_init_identity(&affine) ;
-    cairo_matrix_init_identity(&caffine) ;
+    // create a new canvas to draw pattern on
 
-    Transform &trs = ctx->transforms.back() ;
-    cairo_matrix_t patm;
-    cairo_matrix_init(&patm, pat->trans_.m_[0], pat->trans_.m_[1], pat->trans_.m_[2], pat->trans_.m_[3],
-            pat->trans_.m_[4], pat->trans_.m_[5]) ;
-    //cairo_get_matrix(ctx->cr, &trsm) ;
+    std::shared_ptr<Canvas> pattern(new PatternCanvas(tile_w, tile_h)) ;
 
-    cairo_matrix_multiply(&taffine, &patm, &caffine) ;
+    // recursively render children of the element into this canvas
+    RenderingContext pctx(*pattern) ;
 
-    scwscale = sqrt (taffine.xx * taffine.xx + taffine.xy * taffine.xy);
-    schscale = sqrt (taffine.yx * taffine.yx + taffine.yy * taffine.yy);
+    pattern->setTransform(tile_transform) ;
 
-    pbw = ipw * bbwscale * scwscale;
-    pbh = iph * bbhscale * schscale;
+    vector<Element *> children ;
+    e.collectChildren(children);
+    for( auto c: children ) pctx.render(c) ;
 
-    scwscale = (double) pbw / (double) (ipw * bbwscale);
-    schscale = (double) pbh / (double) (iph * bbhscale);
+    // Compute pattern space transformation.
 
-    cairo_surface_t *surface = cairo_surface_create_similar (cairo_get_target (cr),
-                                                             CAIRO_CONTENT_COLOR_ALPHA, pbw, pbh);
-    cr_pattern = cairo_create (surface);
+    pattern_transform.translate(tile_x, tile_y);
+    pattern_transform.postmult(trans);
 
-    if (pat->pattern_units_ == Pattern::ObjectBoundingBox) {
-        /* subtract the pattern origin */
-        affine.x0 = ctx->obbox.x + ipx * ctx->obbox.w;
-        affine.y0 = ctx->obbox.y + ipy * ctx->obbox.h;
-    } else {
-        /* subtract the pattern origin */
-        affine.x0 = ipx;
-        affine.y0 = ipy;
-    }
+    PatternBrush brush(pattern) ;
+    brush.setTransform(pattern_transform) ;
+    brush.setSpread(SpreadMethod::Repeat) ;
 
-    cairo_matrix_multiply(&affine, &affine, &patm) ;
+    float gopac = states_.back().getOpacity() ;
+    brush.setFillOpacity(gopac * a);
 
-    double sw = ipw * bbwscale;
-    double sh = iph * bbhscale;
+    canvas_.setBrush(brush) ;
 
-    Transform prs ;
-
-    if ( pat->view_box_.w == 0 ) pat->view_box_.w = sw ;
-    if ( pat->view_box_.h == 0 ) pat->view_box_.h = sh ;
-
-    if ( pat->view_box_.w != 0.0 && pat->view_box_.h != 0.0 )
-    {
-        ViewBox vbox = pat->view_box_ ;
-
-        double ofx = 0, ofy = 0 ;
-        double aspScaleX = 1.0 ;
-        double aspScaleY = 1.0 ;
-
-        if ( pat->preserve_aspect_ratio_.view_box_align_ != PreserveAspectRatio::NoViewBoxAlign )
-        {
-            pat->preserve_aspect_ratio_.constrainViewBox(sw, sh, vbox) ;
-
-            aspScaleX = vbox.w/pat->view_box_.w ;
-            aspScaleY = vbox.h/pat->view_box_.h ;
-
-            ofx = vbox.x;
-            ofy = vbox.y ;
-        }
-        else {
-            aspScaleX = sw/vbox.w ;
-            aspScaleY = sh/vbox.h ;
-
-        }
-
-        prs = Transform::translation(-ipx, -ipy) ;
-        prs = Transform::multiply(prs, Transform::scaling(aspScaleX, aspScaleY)) ;
-        prs = Transform::multiply(prs, Transform::translation(ofx , ofy)) ;
-
-    }
-#endif
 }
 
 void RenderingContext::setPaint(Element &e)
@@ -496,10 +441,7 @@ void RenderingContext::applyClipPath(ClipPathElement *e)
 
 }
 
-void RenderingContext::render(CircleElement &)
-{
 
-}
 
 void RenderingContext::render(LineElement &)
 {
@@ -546,8 +488,32 @@ void RenderingContext::render(RectElement &rect)
     postRenderShape() ;
 }
 
-void RenderingContext::render(EllipseElement &)
+void RenderingContext::render(EllipseElement &e)
 {
+    double cx = toPixels(e.cx_, LengthDirection::Horizontal) ;
+    double cy = toPixels(e.cy_, LengthDirection::Vertical) ;
+    double rx = toPixels(e.rx_, LengthDirection::Horizontal) ;
+    double ry = toPixels(e.ry_, LengthDirection::Vertical) ;
+
+    preRenderShape(e, e.style_, e.trans_, Rectangle2d(cx-rx, cy-ry, 2*rx, 2*ry)) ;
+    setPaint(e) ;
+
+    canvas_.drawEllipse(cx, cy, rx, ry) ;
+
+    postRenderShape() ;
+
+}
+
+void RenderingContext::render(CircleElement &e)
+{
+    double cx = toPixels(e.cx_, LengthDirection::Horizontal) ;
+    double cy = toPixels(e.cy_, LengthDirection::Vertical) ;
+    double r = toPixels(e.r_, LengthDirection::Absolute) ;
+
+    preRenderShape(e, e.style_, e.trans_, Rectangle2d(cx-r, cy-r, 2*r, 2*r)) ;
+    setPaint(e) ;
+    canvas_.drawCircle(cx, cy, r) ;
+    postRenderShape() ;
 
 }
 
@@ -566,22 +532,26 @@ void RenderingContext::render(TextSpanElement &)
 
 }
 
+void RenderingContext::render(Element *e) {
+    if ( auto p = dynamic_cast<SVGElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<RectElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<PathElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<PolygonElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<PolylineElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<CircleElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<EllipseElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<GroupElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<SymbolElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<UseElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<ImageElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<TextElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<TextSpanElement *>(e) ) render(*p) ;
+}
+
 void RenderingContext::renderChildren(const Element &e)
 {
     for( const auto c: e.children() ) {
-        if ( auto p = std::dynamic_pointer_cast<SVGElement>(c) ) render(*p) ;
-        else if ( auto p = std::dynamic_pointer_cast<RectElement>(c) ) render(*p) ;
-        else if ( auto p = std::dynamic_pointer_cast<PathElement>(c) ) render(*p) ;
-        else if ( auto p = std::dynamic_pointer_cast<PolygonElement>(c) ) render(*p) ;
-        else if ( auto p = std::dynamic_pointer_cast<PolylineElement>(c) ) render(*p) ;
-        else if ( auto p = std::dynamic_pointer_cast<CircleElement>(c) ) render(*p) ;
-        else if ( auto p = std::dynamic_pointer_cast<EllipseElement>(c) ) render(*p) ;
-        else if ( auto p = std::dynamic_pointer_cast<GroupElement>(c) ) render(*p) ;
-        else if ( auto p = std::dynamic_pointer_cast<SymbolElement>(c) ) render(*p) ;
-        else if ( auto p = std::dynamic_pointer_cast<UseElement>(c) ) render(*p) ;
-        else if ( auto p = std::dynamic_pointer_cast<ImageElement>(c) ) render(*p) ;
-        else if ( auto p = std::dynamic_pointer_cast<TextElement>(c) ) render(*p) ;
-        else if ( auto p = std::dynamic_pointer_cast<TextSpanElement>(c) ) render(*p) ;
+        render(c.get()) ;
     }
 }
 

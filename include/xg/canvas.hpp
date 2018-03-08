@@ -35,7 +35,6 @@ public:
     void save() ;
     void restore() ;
 
-
     void setTransform(const Matrix2d &tr) ;
 
     void setPen(const Pen &pen) ;
@@ -92,9 +91,12 @@ public:
     Image getImage() ;
 
     void saveToPng(const std::string &fname) ;
+} ;
 
-private:
-    double dpi_ ;
+// frontend for cairo recording surface
+class PatternCanvas: public Canvas {
+public:
+    PatternCanvas(double width, double height) ;
 } ;
 
 

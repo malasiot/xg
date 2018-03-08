@@ -57,6 +57,7 @@ public:
       void render(TextSpanElement &) ;
       //void visit(StyleElement &) override ;
 
+      void render(Element *e) ;
       void renderChildren(const Element &e) ;
 
       void setShapeAntialias(ShapeQuality aa);

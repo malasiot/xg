@@ -25,9 +25,9 @@ protected:
     template <typename T>
     std::shared_ptr<T> createNode(const Dictionary &a, bool is_root = false) {
         auto node = std::make_shared<T>() ;
-        if ( is_root ) {
+        if ( is_root )
             root_ = dynamic_cast<svg::SVGElement *>(node.get()) ;
-        }
+
         node->setRoot(root_) ;
 
         auto ele = std::dynamic_pointer_cast<svg::Element>(node) ;

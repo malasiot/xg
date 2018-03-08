@@ -28,25 +28,9 @@ class PathData
 {
 public:
 
-    enum Command { MoveToCmd, ClosePathCmd, LineToCmd, CurveToCmd, SmoothCurveToCmd,
-                   QuadCurveToCmd, SmoothQuadCurveToCmd, EllipticArcToCmd } ;
-
     PathData() {}
 
     void parse(const std::string &str) ;
-
-    struct Element {
-        Element(Command cc, double arg1 = 0, double arg2 = 0, double arg3 = 0, double arg4 = 0,
-                double arg5 = 0, double arg6 = 0) {
-            cmd = cc ;
-            args_[0] = arg1 ; args_[1] = arg2 ; args_[2] = arg3 ; args_[3] = arg4 ; args_[4] = arg5 ;
-            args_[5] = arg6 ;
-        }
-        double args_[6] ;
-        Command cmd ;
-    } ;
-
-    std::vector<Element> elements_ ;
 
     Path path_ ;
 } ;
@@ -342,10 +326,14 @@ public:
     ViewBox viewBox() ;
     PreserveAspectRatio preserveAspectRatio() ;
 
+    bool hasViewBox() const { return view_box_.hasValue() ; }
+
+    void collectChildren(std::vector<Element *> &children);
+
 protected:
 
-    Attribute<PatternUnits> pattern_units_{PatternUnits::UserSpaceOnUse} ;
-    Attribute<PatternUnits> pattern_content_units_{PatternUnits::ObjectBoundingBox} ;
+    Attribute<PatternUnits> pattern_units_{PatternUnits::ObjectBoundingBox} ;
+    Attribute<PatternUnits> pattern_content_units_{PatternUnits::UserSpaceOnUse} ;
     Attribute<Matrix2d> trans_{Matrix2d()} ;
     Attribute<Length> x_{0}, y_{0}, width_{0}, height_{0} ;
     Attribute<ViewBox> view_box_{ViewBox()} ;

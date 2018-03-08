@@ -5,6 +5,7 @@
 #include <xg/xform.hpp>
 
 #include <vector>
+#include <memory>
 
 namespace xg {
 
@@ -18,12 +19,11 @@ public:
     virtual ~Brush() = default;
 
     void setFillRule(FillRule rule) ;
-    void setFillOpacity(double opacity) ;
+    void setFillOpacity(double opacity) { fill_opacity_ = opacity; }
 
     double fillOpacity() const { return fill_opacity_ ; }
     FillRule fillRule() const { return fill_rule_ ; }
 
-  //  enum Type { Solid, LinearGradient, RadialGradient, Pattern, None } ;
 
 protected:
 
@@ -50,7 +50,6 @@ private:
 } ;
 
 enum class SpreadMethod { Pad, Repeat, Reflect } ;
-enum BrushUnits { UserSpaceOnUse, ObjectBoundingBox } ;
 
 class GradientBrush: public Brush {
 
@@ -58,8 +57,6 @@ public:
 
     void setSpread(SpreadMethod method) { sm_ = method ; }
     void setTransform(const Matrix2d &trans) { tr_ = trans ; }
-    void setUnits(BrushUnits un) { gu_ = un ; }
-
 
     struct Stop {
         Stop(double offset, const Color &clr): offset_(offset), clr_(clr) {}
@@ -73,7 +70,6 @@ public:
     }
 
 
-    BrushUnits units() const { return gu_ ; }
     SpreadMethod spread() const { return sm_ ; }
     const Matrix2d &transform() const { return tr_ ; }
     const std::vector<Stop> &stops() const { return stops_ ; }
@@ -87,8 +83,6 @@ private:
     std::vector<Stop> stops_ ;
     SpreadMethod sm_ ;
     Matrix2d tr_ ;
-    BrushUnits gu_ ;
-
 } ;
 
 
@@ -96,8 +90,8 @@ class LinearGradientBrush: public GradientBrush {
 
 public:
 
-    LinearGradientBrush(double x0, double y0, double x1, double y1, BrushUnits units = UserSpaceOnUse):
-        x0_(x0), y0_(y0), x1_(x1), y1_(y1) { setUnits(units) ;}
+    LinearGradientBrush(double x0, double y0, double x1, double y1):
+        x0_(x0), y0_(y0), x1_(x1), y1_(y1) {}
 
     double x0() const { return x0_ ; }
     double y0() const { return y0_ ; }
@@ -113,8 +107,8 @@ class RadialGradientBrush: public GradientBrush {
 
 public:
 
-    RadialGradientBrush(double cx, double cy, double r, double fx = 0, double fy = 0, BrushUnits units = UserSpaceOnUse):
-        cx_(cx), cy_(cy), fx_(fx), fy_(fy), r_(r)  { setUnits(units) ; }
+    RadialGradientBrush(double cx, double cy, double r, double fx = 0, double fy = 0):
+        cx_(cx), cy_(cy), fx_(fx), fy_(fy), r_(r)  {}
 
     double cx() const { return cx_ ; }
     double cy() const { return cy_ ; }
@@ -127,27 +121,26 @@ private:
     double cx_, cy_, fx_, fy_, r_ ;
 } ;
 
-struct PatternSurface {
-
-} ;
+class Canvas ;
 
 class PatternBrush: public Brush {
 
 public:
 
-    enum Units { UserSpaceOnUse, ObjectBoundingBox } ;
+    PatternBrush(const std::shared_ptr<Canvas> &pattern):  pattern_(pattern), sm_(SpreadMethod::Pad)  {}
 
-    PatternBrush(PatternSurface &surf, Units units = UserSpaceOnUse):
-        pu_(units), surf_(surf)  {}
+    void setTransform(const Matrix2d &trans) { tr_ = trans ; }
+    void setSpread(SpreadMethod method) { sm_ = method ; }
 
-    void setMatrix2d(const Matrix2d &trans) { tr_ = trans ; }
+    Matrix2d transform() const { return tr_ ; }
+    Canvas &pattern() const { return *pattern_ ; }
+    SpreadMethod spread() const { return sm_ ; }
 
 private:
 
-    PatternSurface &surf_ ;
+    SpreadMethod sm_ ;
+    std::shared_ptr<Canvas> pattern_ ;
     Matrix2d tr_ ;
-    Units pu_ ;
-    double width_, height_ ;
 
 } ;
 

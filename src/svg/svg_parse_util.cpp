@@ -164,9 +164,9 @@ bool parse_transform(const string &str, Matrix2d &res)
              if ( !parse_number_list(p, nums) ) return false ;
 
              if ( nums.size() == 1 )
-                 res.rotate(nums[0]) ;
+                 res.rotate(nums[0] * M_PI / 180.0) ;
              else if ( nums.size() == 3 )
-                 res.rotate(nums[0], Point2d(nums[1], nums[2])) ;
+                 res.rotate(nums[0] * M_PI / 180.0, Point2d(nums[1], nums[2])) ;
 
          }
          else if ( strncmp(p, "scale", 5) == 0 )  {

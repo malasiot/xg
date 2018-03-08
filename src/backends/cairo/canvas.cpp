@@ -141,7 +141,32 @@ void Backend::cairo_apply_radial_gradient(const RadialGradientBrush &rg) {
     cairo_pattern_destroy (pattern);
 }
 
-void Backend::cairo_apply_pattern(const PatternBrush &pat) {}
+void Backend::cairo_apply_pattern(const PatternBrush &pat) {
+
+    Canvas &c = pat.pattern() ;
+
+    cairo_pattern_t *pattern = cairo_pattern_create_for_surface (c.surf_);
+
+    if ( pat.spread() == SpreadMethod::Reflect )
+        cairo_pattern_set_extend (pattern, CAIRO_EXTEND_REFLECT);
+    else if ( pat.spread() == SpreadMethod::Repeat )
+        cairo_pattern_set_extend (pattern, CAIRO_EXTEND_REPEAT);
+    else
+        cairo_pattern_set_extend (pattern, CAIRO_EXTEND_PAD);
+
+    cairo_matrix_t matrix;
+
+    Matrix2d tr = pat.transform() ;
+    cairo_matrix_init (&matrix, tr.m1(), tr.m2(), tr.m3(), tr.m4(), tr.m5(), tr.m6());
+    cairo_matrix_invert (&matrix);
+    cairo_pattern_set_matrix (pattern, &matrix);
+
+    cairo_pattern_set_filter (pattern, CAIRO_FILTER_BEST); //?
+
+    cairo_set_source (cr_, pattern);
+
+    cairo_pattern_destroy (pattern);
+}
 /*
 void Backend::cairo_apply_pattern(const PatternBrush &pat)
 {
@@ -802,7 +827,6 @@ ImageCanvas::ImageCanvas(double w, double h, double dpi): Canvas(w, h, dpi, dpi)
     cr_ = cairo_create(surf_) ;
 }
 
-
 Image ImageCanvas::getImage()
 {
     char *src = (char *)cairo_image_surface_get_data(surf_) ;
@@ -948,6 +972,11 @@ void Canvas::setAntialias(bool anti_alias)
         cairo_set_antialias (cr_, CAIRO_ANTIALIAS_NONE);
 }
 
+PatternCanvas::PatternCanvas(double width, double height): Canvas(width, height, 92, 92) {
+    cairo_rectangle_t r{0, 0, width, height} ;
+    surf_ = cairo_recording_surface_create(CAIRO_CONTENT_COLOR_ALPHA, &r) ;
+    cr_ = cairo_create(surf_) ;
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 

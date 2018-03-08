@@ -367,6 +367,31 @@ Length RadialGradientElement::r() {
     INHERIT_ATTRIBUTE(RadialGradientElement, r_, Length)
 }
 
+void PatternElement::collectChildren(std::vector<Element *> &child_list)
+{
+    vector<Element *> this_element_children ;
+    for( const auto &c: children() ) {
+        this_element_children.emplace_back(c.get()) ;
+    }
+
+    if ( !this_element_children.empty() ) {
+        std::swap(this_element_children, child_list) ;
+        return ;
+    }
+
+    // no child elements found we need to look on referenced elements
+
+    Element *p = root().resolve(href_) ;
+    PatternElement *q = nullptr ;
+
+    if (p) {
+        q = dynamic_cast<PatternElement *>(p) ;
+        if ( !q ) return ;
+
+        q->collectChildren(child_list) ;
+    }
+
+}
 
 void PatternElement::parseAttributes(const Dictionary &attrs)
 {

@@ -28,8 +28,6 @@ SET ( XG_FILES
 
     ${SRC_ROOT}/svg/svg_parser.cpp
     ${SRC_ROOT}/svg/svg_parser.hpp
-    ${SRC_ROOT}/svg/svg_href_resolver.cpp
-    ${SRC_ROOT}/svg/svg_href_resolver.hpp
     ${SRC_ROOT}/svg/svg_document.cpp
     ${SRC_ROOT}/svg/svg_dom.cpp
     ${SRC_ROOT}/svg/svg_length.cpp
