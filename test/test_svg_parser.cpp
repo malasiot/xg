@@ -10,9 +10,10 @@ using namespace std ;
 
 int main(int argc, char *argv[]) {
 
+
     SVGDocument doc ;
 
-    ifstream strm("/home/malasiot/Downloads/Use03.svg") ;
+    ifstream strm("/home/malasiot/Downloads/image.svg") ;
     try {
         doc.readStream(strm) ;
 

@@ -861,32 +861,17 @@ Image ImageCanvas::getImage()
 }
 
 
-void Canvas::drawImage(const Image &im, double x0, double y0, double w, double h,
-                        double opacity )
+void Canvas::drawImage(const Image &im,  double opacity )
 {
     cairo_surface_t *imsurf = detail::cairo_create_image_surface(im) ;
 
-    unsigned width = im.width() ;
-    unsigned height = im.height() ;
-/*
-    Transform trs = getViewBoxTransform(w, h, width, height, 0, 0, policy, align ) ;
+    cairo_save(cr_) ;
 
-    cairo_save(cr) ;
+    cairo_set_source_surface(cr_, (cairo_surface_t *)imsurf, 0, 0);
 
-    cairo_translate(cr, x0, y0) ;
-    cairo_push_transform(cr, trs) ;
+    cairo_paint_with_alpha (cr_, opacity);
 
-    cairo_set_source_surface(cr, (cairo_surface_t *)imsurf, 0, 0);
-
-    set_object_bbox(x0, y0, w, h) ;
-
-    cairo_paint_with_alpha (cr, opacity);
-    cairo_restore(cr) ;
-*/
     cairo_surface_destroy(imsurf) ;
-
-
-
 }
 
 

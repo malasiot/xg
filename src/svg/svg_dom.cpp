@@ -3,6 +3,7 @@
 #include "svg_dom.hpp"
 
 #include <xg/util/strings.hpp>
+#include <xg/util/base64.hpp>
 
 using namespace std ;
 
@@ -31,6 +32,18 @@ Element *SVGElement::resolve(const std::string &uri) const {
         return p ;
     }
     return nullptr ;
+}
+
+Image SVGElement::loadImageResource(const string &uri, Element *container) {
+    auto it = cached_images_.find(container) ;
+    if ( it != cached_images_.end() ) return it->second ;
+
+    if ( startsWith(uri, "data:image/png;base64") ) {
+        string png_data = base64_decode(uri.substr(22)) ;
+        auto image =  Image::loadPNGBuffer(png_data) ;
+        cached_images_[container] = image ;
+        return image ;
+    }
 }
 
 void Element::parseElementAttributes(const Dictionary &attrs) {
@@ -503,7 +516,9 @@ void ImageElement::parseAttributes(const Dictionary &attrs)
     parseAttribute("height", attrs, height_) ;
 
     parseAttribute("preserveAspectRatio", attrs, preserve_aspect_ratio_) ;
-    parseAttribute("xlink::href", attrs, uri_) ;
+
+    uri_ = attrs.get("xlink:href") ;
+
 }
 
 void StyleElement::parseAttributes(const Dictionary &attrs) {
@@ -795,14 +810,26 @@ void PathData::parse(const string &str) {
 
          ++it ;
      }
-
 }
+
+
+void SymbolElement::parseAttributes(const Dictionary &attrs) {
+    parseElementAttributes(attrs) ;
+    parseStyleAttributes(attrs, style_) ;
+    parseViewBoxAttributes(attrs,  view_box_, preserve_aspect_ratio_);
+
+    parseAttribute("width", attrs, width_) ;
+    parseAttribute("height", attrs, height_) ;
+
+    parseAttribute("x", attrs, x_) ;
+    parseAttribute("y", attrs, y_) ;
+}
+
 
 void TextElement::parseAttributes(const Dictionary &a)
 {
 
 }
-
 
 }
 }

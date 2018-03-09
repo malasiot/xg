@@ -25,6 +25,7 @@ SET ( XG_FILES
 
     ${SRC_ROOT}/util/dictionary.cpp
     ${SRC_ROOT}/util/strings.cpp
+    ${SRC_ROOT}/util/base64.cpp
 
     ${SRC_ROOT}/svg/svg_parser.cpp
     ${SRC_ROOT}/svg/svg_parser.hpp

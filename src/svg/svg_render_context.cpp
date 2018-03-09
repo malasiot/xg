@@ -517,8 +517,47 @@ void RenderingContext::render(CircleElement &e)
 
 }
 
-void RenderingContext::render(ImageElement &)
-{
+void RenderingContext::render(ImageElement &e) {
+
+    if ( e.uri_.empty() ) return ;
+
+     pushState(e.style_) ;
+     pushTransform(e.trans_) ;
+
+     canvas_.save() ;
+     canvas_.setTransform(e.trans_);
+
+     Style &st = states_.back() ;
+
+     float ix = toPixels(e.x_, LengthDirection::Horizontal) ;
+     float iy = toPixels(e.y_, LengthDirection::Vertical) ;
+     float iw = toPixels(e.width_, LengthDirection::Horizontal) ;
+     float ih = toPixels(e.height_, LengthDirection::Vertical) ;
+
+     if ( iw == 0.0 || ih == 0 ) return ;
+
+     float opc = st.getOpacity() ;
+
+     Image im = e.root().loadImageResource(e.uri_, &e);
+     if ( !im.pixels() ) return ;
+
+     double width = im.width() ;
+     double height = im.height() ;
+
+     Matrix2d trs = e.preserve_aspect_ratio_.getViewBoxTransform(iw, ih, width, height, 0, 0 ) ;
+
+     trs.translate(ix, iy) ;
+
+     canvas_.save() ;
+     canvas_.setTransform(trs) ;
+     canvas_.drawImage(im, opc) ;
+     canvas_.restore() ;
+
+
+     canvas_.restore() ;
+
+     popTransform() ;
+     popState() ;
 
 }
 
@@ -541,7 +580,6 @@ void RenderingContext::render(Element *e) {
     else if ( auto p = dynamic_cast<CircleElement *>(e) ) render(*p) ;
     else if ( auto p = dynamic_cast<EllipseElement *>(e) ) render(*p) ;
     else if ( auto p = dynamic_cast<GroupElement *>(e) ) render(*p) ;
-    else if ( auto p = dynamic_cast<SymbolElement *>(e) ) render(*p) ;
     else if ( auto p = dynamic_cast<UseElement *>(e) ) render(*p) ;
     else if ( auto p = dynamic_cast<ImageElement *>(e) ) render(*p) ;
     else if ( auto p = dynamic_cast<TextElement *>(e) ) render(*p) ;
@@ -555,9 +593,42 @@ void RenderingContext::renderChildren(const Element &e)
     }
 }
 
-void RenderingContext::render(SymbolElement &)
+void RenderingContext::render(SymbolElement &e, double pw, double ph)
 {
+    pushState(e.style_) ;
 
+    float xx, yy, sw, sh ;
+
+    xx = toPixels(e.x_, LengthDirection::Horizontal) ;
+    yy = toPixels(e.y_, LengthDirection::Vertical) ;
+
+    sw = ( pw == 0 ) ? toPixels(e.width_, LengthDirection::Horizontal) : pw ;
+    sh = ( ph == 0 ) ? toPixels(e.height_, LengthDirection::Vertical) : ph ;
+
+    ViewBox vbox = e.view_box_ ;
+
+    if ( vbox.width_ == 0 ) vbox.width_ = sw ;
+    if ( vbox.height_ == 0 ) vbox.height_ = sh ;
+
+    view_boxes_.push_back(vbox) ;
+
+    Matrix2d trs = e.preserve_aspect_ratio_.getViewBoxTransform(sw, sh, vbox.width_, vbox.height_, vbox.x_, vbox.y_) ;
+
+    canvas_.save() ;
+    canvas_.setTransform(trs) ;
+
+    OverflowType ov = e.style_.getOverflow() ;
+
+    if ( ov == OverflowType::Scroll || ov == OverflowType::Hidden )
+        canvas_.setClipRect(xx, yy, sw, sh) ;
+
+    renderChildren(e);
+
+    canvas_.restore() ;
+
+    view_boxes_.pop_back();
+
+    popState() ;
 }
 
 void RenderingContext::render(GroupElement &g) {
@@ -586,11 +657,10 @@ void RenderingContext::render(UseElement &e)
     canvas_.save() ;
     canvas_.setTransform(trc) ;
 
-    if ( auto symbol = dynamic_cast<SymbolElement *>(eref) )  {
-
-    }
+    if ( auto symbol = dynamic_cast<SymbolElement *>(eref) )
+        render(*symbol, sw, sh) ;
     else
-       render(eref) ;
+        render(eref) ;
 
     canvas_.restore() ;
 

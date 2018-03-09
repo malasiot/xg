@@ -68,7 +68,7 @@ public:
     void drawText(const std::string &textStr, double x0, double y0) ;
     void drawText(const std::string &textStr, double x0, double y0, double width, double height, unsigned int flags) ;
 
-    void drawImage(const Image &im, double x0, double y0, double width, double height, double opacity) ;
+    void drawImage(const Image &im,  double opacity) ;
 
     void drawSVG(const SVGDocument &doc) ;
 

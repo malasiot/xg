@@ -11,6 +11,7 @@ class Image {
 
 public:
 
+    Image() = default ;
     Image(unsigned int width, unsigned int height, ImageFormat fmt = ImageFormat::ARGB32) ;
 
     unsigned width() const { return width_ ; }
@@ -23,6 +24,9 @@ public:
     bool saveToPNG(const std::string &fileName) ;
     bool saveToPNGBuffer(std::string &data);
 
+    static Image loadPNG(const std::string &fileName) ;
+    static Image loadPNGBuffer(const std::string &data) ;
+
     ~Image() = default;
 
 private:
@@ -30,9 +34,12 @@ private:
     template<typename W>
     bool png_write(W &writer) ;
 
+    template<typename R>
+    static Image png_read(R &reader) ;
+
     std::shared_ptr<char> pixels_ ;
-    unsigned width_, height_, stride_ ;
-    ImageFormat format_ ;
+    unsigned width_ = 0, height_ = 0 , stride_ = 0 ;
+    ImageFormat format_ = ImageFormat::ARGB32;
 };
 
 

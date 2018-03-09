@@ -49,7 +49,7 @@ public:
       void render(EllipseElement &) ;
       //void visit(DefsElement &) override ;
       void render(GroupElement &) ;
-      void render(SymbolElement &) ;
+      void render(SymbolElement &, double pw, double ph) ;
       void render(UseElement &) ;
      // void visit(ClipPathElement &) override ;
       void render(ImageElement &) ;

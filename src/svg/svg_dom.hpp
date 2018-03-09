@@ -5,6 +5,7 @@
 #include <xg/util/dictionary.hpp>
 #include <xg/xform.hpp>
 #include <xg/path.hpp>
+#include <xg/canvas.hpp>
 
 #include "svg_length.hpp"
 #include "svg_dom_exceptions.hpp"
@@ -351,7 +352,7 @@ public:
 
     void parseAttributes(const Dictionary &attrs) ;
 
-    URI uri_ ;
+    std::string uri_ ;
     Length x_{0}, y_{0}, width_{0}, height_{0} ;
     PreserveAspectRatio preserve_aspect_ratio_ ;
 } ;
@@ -560,6 +561,7 @@ public:
     }
 
     Element *resolve(const std::string &uri) const ;
+    xg::Image loadImageResource(const std::string &uri, Element *container) ;
 
 
     Length x_, y_, width_, height_ ;
@@ -568,15 +570,19 @@ public:
 protected:
 
     std::map<std::string, svg::Element *> elements_ ;
-    std::map<svg::Element *, std::string> refs_ ;
+    std::map<svg::Element *, Image> cached_images_ ;
 
 } ;
 
-class SymbolElement: public SVGElement {
+class SymbolElement:  public GroupContainer, public Stylable, public FitToViewBox {
 
 public:
 
     SymbolElement() = default ;
+
+    void parseAttributes(const Dictionary &attrs) ;
+
+    Length x_{0.0}, y_{0.0}, width_{1.0_perc}, height_{1.0_perc} ;
 } ;
 
 class UnsupportedElement: public Element {
