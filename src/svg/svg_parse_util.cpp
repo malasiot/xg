@@ -196,6 +196,7 @@ bool parse_transform(const string &str, Matrix2d &res)
              if ( nums.size() >= 1 )
                  res.premult(Matrix2d::skewing(0, nums[0])) ;
          }
+         else return false ;
 
          eat_white_comma(p) ;
      }

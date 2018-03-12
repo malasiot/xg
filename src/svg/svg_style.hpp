@@ -96,7 +96,7 @@ class Style
 
     using dash_array_t = std::vector<Length> ;
 
-    FillRule getfillRule() const { return findAttribute<FillRule>(StyleAttributeType::FillRule, FillRule::NonZero) ;  }
+    FillRule getFillRule() const { return findAttribute<FillRule>(StyleAttributeType::FillRule, FillRule::NonZero) ;  }
     std::string getClipPath() const { return findAttribute<std::string>(StyleAttributeType::ClipPath, std::string()) ; }
     ShapeQuality getShapeQuality() const { return findAttribute<ShapeQuality>(StyleAttributeType::ShapeRendering, ShapeQuality::Auto) ;}
     Length getStrokeWidth() const { return findAttribute<Length>(StyleAttributeType::StrokeWidth, 1.0) ;}

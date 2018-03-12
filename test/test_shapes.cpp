@@ -16,6 +16,11 @@ int main(int argc, char *argv[]) {
 
     ImageCanvas canvas(1024, 512) ;
 
+    Path p ;
+    p.addEllipse(10, 10, 80, 80) ;
+    p.addEllipse(100, 100, 80, 80) ;
+    canvas.setClipPath(p) ;
+
     canvas.setPen(Pen()) ;
     canvas.setBrush(SolidBrush(NamedColor::blue())) ;
 
@@ -43,6 +48,8 @@ int main(int argc, char *argv[]) {
 
             canvas.restore() ;
         }
+
+
 
     canvas.getImage().saveToPNG("/tmp/oo.png") ;
 

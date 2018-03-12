@@ -111,11 +111,31 @@ void RenderingContext::popState() {
 }
 
 void RenderingContext::pushTransform(const Matrix2d &trs) {
-    transforms_.push_back(trs) ;
+    if ( transforms_.empty() )
+        transforms_.push_back(trs) ;
+    else {
+        Matrix2d c(transforms_.back()) ;
+        c.premult(trs) ;
+        transforms_.emplace_back(c) ;
+    }
 }
 
 void RenderingContext::popTransform() {
     transforms_.pop_back() ;
+}
+
+void RenderingContext::clip(Element &c, const Style &st) {
+
+    string cp_id = st.getClipPath() ;
+    if ( !cp_id.empty() ) {
+        Element *p = c.root().resolve(cp_id) ;
+
+        if ( p ) {
+            auto e = dynamic_cast<ClipPathElement *>(p) ;
+            if ( e ) applyClipPath(e) ;
+        }
+    }
+
 }
 
 void RenderingContext::preRenderShape(Element &e, const Style &s, const Matrix2d &t, const Rectangle2d &bounds)
@@ -123,24 +143,12 @@ void RenderingContext::preRenderShape(Element &e, const Style &s, const Matrix2d
     pushState(s) ;
     pushTransform(t) ;
 
-    Style &st = states_.back() ;
-
     canvas_.save() ;
     canvas_.setTransform(t) ;
 
+    clip(e, s) ;
+
     obbox_ = bounds ;
-
-    if ( rendering_mode_ == RenderingMode::Display ) {
-        string cp_id = st.getClipPath() ;
-        if ( !cp_id.empty() ) {
-            Element *p = e.root().resolve(cp_id) ;
-
-            if ( p ) {
-                auto e = dynamic_cast<ClipPathElement *>(p) ;
-                if ( e ) applyClipPath(e) ;
-            }
-        }
-    }
 }
 
 void RenderingContext::setShapeAntialias (ShapeQuality aa) {
@@ -332,6 +340,7 @@ void RenderingContext::setPatternBrush(PatternElement &e, float a)
 
 void RenderingContext::setPaint(Element &e)
 {
+
     Style &st = states_.back() ;
 
     setShapeAntialias(st.getShapeQuality()) ;
@@ -406,7 +415,18 @@ void RenderingContext::setPaint(Element &e)
         const CSSColor &css_clr = fill_paint.clr_or_server_id_.get<CSSColor>() ;
         Color clr(css_clr, fill_opacity * opacity) ;
 
-        canvas_.setBrush(SolidBrush(clr)) ;
+        FillRule fill_rule = st.getFillRule() ;
+
+        SolidBrush brush(clr) ;
+
+        if ( fill_rule == FillRule::NonZero )
+            brush.setFillRule(xg::FillRule::NonZero) ;
+        else
+            brush.setFillRule(xg::FillRule::EvenOdd) ;
+
+        canvas_.setBrush(brush) ;
+
+
     }
     else if ( fill_paint.type_ == PaintType::PaintServer ) {
 
@@ -436,8 +456,27 @@ void RenderingContext::postRenderShape()
     popState() ;
 }
 
-void RenderingContext::applyClipPath(ClipPathElement *e)
+void RenderingContext::applyClipPath(ClipPathElement *cp)
 {
+    RenderingContext clipCtx(canvas_, RenderingMode::Cliping) ;
+
+    clipCtx.clip(*cp, cp->style_) ;
+
+    clipCtx.pushState(cp->style_) ;
+    clipCtx.pushTransform(cp->trans_) ;
+
+    for( auto c: cp->children() ) {
+        clipCtx.clip(c.get()) ;
+    }
+
+    xg::FillRule fr ;
+
+    if ( cp->style_.getFillRule() == FillRule::EvenOdd )
+        fr = xg::FillRule::EvenOdd ;
+    else
+        fr = xg::FillRule::NonZero ;
+
+    canvas_.setClipPath(clipCtx.clip_path_, fr) ;
 
 }
 
@@ -448,9 +487,24 @@ void RenderingContext::render(LineElement &)
 
 }
 
-void RenderingContext::render(PolygonElement &)
+void RenderingContext::render(PolygonElement &e)
 {
+    const auto &pts = e.points_.points_;
+    if ( pts.size() == 0 ) return ;
 
+    Path p ;
+    p.addPolygon(pts) ;
+
+    if  ( rendering_mode_ == RenderingMode::Display ) {
+        preRenderShape(e, e.style_, e.trans_, p.extents()) ;
+        setPaint(e) ;
+        canvas_.drawPath(p) ;
+        postRenderShape() ;
+    } else {
+        pushTransform(e.trans_) ;
+        addClipPath(p) ;
+        popTransform() ;
+    }
 }
 
 void RenderingContext::render(PolylineElement &)
@@ -459,10 +513,18 @@ void RenderingContext::render(PolylineElement &)
 }
 
 void RenderingContext::render(PathElement &e) {
-    preRenderShape(e, e.style_, e.trans_, Rectangle2d()) ;
-    setPaint(e) ;
-    canvas_.drawPath(e.path_.path_) ;
-    postRenderShape() ;
+    const auto &p = e.path_.path_ ;
+
+    if  ( rendering_mode_ == RenderingMode::Display ) {
+        preRenderShape(e, e.style_, e.trans_, p.extents()) ;
+        setPaint(e) ;
+        canvas_.drawPath(p) ;
+        postRenderShape() ;
+    } else {
+        pushTransform(e.trans_) ;
+        addClipPath(p) ;
+        popTransform() ;
+    }
 }
 
 void RenderingContext::render(RectElement &rect)
@@ -480,12 +542,16 @@ void RenderingContext::render(RectElement &rect)
     if (rxp == 0) rxp = ryp;
     else if (ryp == 0) ryp = rxp ;
 
-    preRenderShape(rect, rect.style_, rect.trans_, Rectangle2d(xp, yp, wp, hp)) ;
-    setPaint(rect) ;
-
-    canvas_.drawPath(Path().addRoundedRect(xp, yp, wp, hp, rxp, ryp)) ;
-
-    postRenderShape() ;
+    if  ( rendering_mode_ == RenderingMode::Display ) {
+        preRenderShape(rect, rect.style_, rect.trans_, Rectangle2d(xp, yp, wp, hp)) ;
+        setPaint(rect) ;
+        canvas_.drawPath(Path().addRoundedRect(xp, yp, wp, hp, rxp, ryp)) ;
+        postRenderShape() ;
+    } else {
+        pushTransform(rect.trans_) ;
+        addClipPath(Path().addRoundedRect(xp, yp, wp, hp, rxp, ryp)) ;
+        popTransform() ;
+    }
 }
 
 void RenderingContext::render(EllipseElement &e)
@@ -495,12 +561,16 @@ void RenderingContext::render(EllipseElement &e)
     double rx = toPixels(e.rx_, LengthDirection::Horizontal) ;
     double ry = toPixels(e.ry_, LengthDirection::Vertical) ;
 
-    preRenderShape(e, e.style_, e.trans_, Rectangle2d(cx-rx, cy-ry, 2*rx, 2*ry)) ;
-    setPaint(e) ;
-
-    canvas_.drawEllipse(cx, cy, rx, ry) ;
-
-    postRenderShape() ;
+    if  ( rendering_mode_ == RenderingMode::Display ) {
+        preRenderShape(e, e.style_, e.trans_, Rectangle2d(cx-rx, cy-ry, 2*rx, 2*ry)) ;
+        setPaint(e) ;
+        canvas_.drawEllipse(cx, cy, rx, ry) ;
+        postRenderShape() ;
+    } else {
+        pushTransform(e.trans_) ;
+        addClipPath(Path().addEllipse(cx, cy, rx, ry)) ;
+        popTransform() ;
+    }
 
 }
 
@@ -510,11 +580,16 @@ void RenderingContext::render(CircleElement &e)
     double cy = toPixels(e.cy_, LengthDirection::Vertical) ;
     double r = toPixels(e.r_, LengthDirection::Absolute) ;
 
-    preRenderShape(e, e.style_, e.trans_, Rectangle2d(cx-r, cy-r, 2*r, 2*r)) ;
-    setPaint(e) ;
-    canvas_.drawCircle(cx, cy, r) ;
-    postRenderShape() ;
-
+    if  ( rendering_mode_ == RenderingMode::Display ) {
+        preRenderShape(e, e.style_, e.trans_, Rectangle2d(cx-r, cy-r, 2*r, 2*r)) ;
+        setPaint(e) ;
+        canvas_.drawCircle(cx, cy, r) ;
+        postRenderShape() ;
+    } else {
+        pushTransform(e.trans_) ;
+        addClipPath(Path().addEllipse(cx, cy, r, r)) ;
+        popTransform() ;
+    }
 }
 
 void RenderingContext::render(ImageElement &e) {
@@ -586,12 +661,35 @@ void RenderingContext::render(Element *e) {
     else if ( auto p = dynamic_cast<TextSpanElement *>(e) ) render(*p) ;
 }
 
+void RenderingContext::clip(Element *e) {
+    if ( auto p = dynamic_cast<RectElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<PathElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<PolygonElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<CircleElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<EllipseElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<UseElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<TextElement *>(e) ) render(*p) ;
+}
+
 void RenderingContext::renderChildren(const Element &e)
 {
     for( const auto c: e.children() ) {
         render(c.get()) ;
     }
 }
+
+void RenderingContext::clipChildren(const Element &e)
+{
+    for( const auto c: e.children() ) {
+        clip(c.get()) ;
+    }
+}
+
+void RenderingContext::addClipPath(const Path &p)
+{
+    clip_path_.addPath(p.transformed(transforms_.back())) ;
+}
+
 
 void RenderingContext::render(SymbolElement &e, double pw, double ph)
 {
@@ -651,21 +749,27 @@ void RenderingContext::render(UseElement &e)
 
     trc.premult(trans) ;
 
-    pushState(e.style_) ;
-    pushTransform(trc) ;
+    if ( rendering_mode_ == RenderingMode::Display ) {
+        pushState(e.style_) ;
+        pushTransform(trc) ;
 
-    canvas_.save() ;
-    canvas_.setTransform(trc) ;
+        canvas_.save() ;
+        canvas_.setTransform(trc) ;
 
-    if ( auto symbol = dynamic_cast<SymbolElement *>(eref) )
-        render(*symbol, sw, sh) ;
-    else
-        render(eref) ;
+        if ( auto symbol = dynamic_cast<SymbolElement *>(eref) )
+            render(*symbol, sw, sh) ;
+        else
+            render(eref) ;
 
-    canvas_.restore() ;
+        canvas_.restore() ;
 
-    popTransform() ;
-    popState() ;
+        popTransform() ;
+        popState() ;
+    } else {
+        pushTransform(trc) ;
+        clip(eref) ;
+        popTransform() ;
+    }
 
 }
 

@@ -13,14 +13,14 @@ int main(int argc, char *argv[]) {
 
     SVGDocument doc ;
 
-    ifstream strm("/home/malasiot/Downloads/image.svg") ;
+    ifstream strm("/home/malasiot/Downloads/clippath4.svg") ;
     try {
         doc.readStream(strm) ;
 
         ImageCanvas canvas(1024, 512) ;
 
-        canvas.setBrush(SolidBrush(NamedColor::white())) ;
-        canvas.drawRect(0, 0, 1024, 512) ;
+     //   canvas.setBrush(SolidBrush(Color(NamedColor::white(), 1.0))) ;
+     //   canvas.drawRect(0, 0, 1024, 512) ;
         canvas.drawSVG(doc) ;
 
         canvas.getImage().saveToPNG("/tmp/oo.png") ;

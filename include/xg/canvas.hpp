@@ -50,7 +50,7 @@ public:
     void setAntialias(bool antiAlias = true) ;
 
     void setClipRect(double x0, double y0, double w, double h) ;
-    void setClipPath(const Path &p) ;
+    void setClipPath(const Path &p, FillRule frule= FillRule::EvenOdd) ;
 
     void drawLine(double x0, double y0, double x1, double y1) ;
     void drawLine(const Point2d &p1, const Point2d &p2) ;

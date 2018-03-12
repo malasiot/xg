@@ -114,8 +114,8 @@ Path & Path::curveTo(double x, double y, double x1, double y1, double x2, double
 
 Path & Path::curveToRel(double x, double y, double x1, double y1, double x2, double y2) {
     addCommand(CurveToCmd,  cx_ + x, cy_ + y,
-                     rx_ = cx_ + x1, ry_ = cy_ + y1,
-                     cx_ + x2, cy_ + y2) ;
+               rx_ = cx_ + x1, ry_ = cy_ + y1,
+               cx_ + x2, cy_ + y2) ;
     cx_ += x2 ; cy_ += y2 ;
     return *this ;
 }
@@ -164,7 +164,7 @@ Path & Path::smoothCurveTo(double arg3, double arg4, double arg5, double arg6)
     }
 
     addCommand(CurveToCmd,
-                     arg1, arg2, rx_ = arg3, ry_ = arg4, cx_ = arg5, cy_ = arg6) ;
+               arg1, arg2, rx_ = arg3, ry_ = arg4, cx_ = arg5, cy_ = arg6) ;
 
     return *this ;
 
@@ -184,8 +184,8 @@ Path & Path::smoothCurveToRel(double arg3, double arg4, double arg5, double arg6
     arg1 -= cx_ ; arg2 -= cy_ ;
 
     addCommand(CurveToCmd,
-                     cx_ + arg1, cy_ + arg2, rx_ = cx_ + arg3, ry_ = cy_ + arg4,
-                     arg5 + cx_, arg6 + cy_) ;
+               cx_ + arg1, cy_ + arg2, rx_ = cx_ + arg3, ry_ = cy_ + arg4,
+               arg5 + cx_, arg6 + cy_) ;
     cx_ += arg5 ;
     cy_ += arg6 ;
 
@@ -420,6 +420,80 @@ Path & Path::addPath(const Path &other) {
               std::back_inserter(cmds_)) ;
 
     return *this ;
+}
+
+Path &Path::addPolygon(const std::vector<Point2d> &pts)
+{
+    if ( pts.size() < 3 ) return *this ;
+    moveTo(pts[0].x(), pts[0].y()) ;
+    for( uint i=1 ; i<pts.size() ; i++ )
+        lineTo(pts[i].x(), pts[i].y()) ;
+    closePath() ;
+
+    return *this ;
+}
+
+Path Path::transformed(const Matrix2d &m) const
+{
+    Path res ;
+
+    for ( const CommandBlock &block: cmds_ ) {
+
+        switch ( block.cmd_ ) {
+        case MoveToCmd:
+        case LineToCmd: {
+            auto v = m.transform(block.arg0_, block.arg1_) ;
+            res.cmds_.emplace_back(block.cmd_, v.x(), v.y()) ;
+            break ;
+        }
+        case CurveToCmd: {
+            auto v1 = m.transform(block.arg0_, block.arg1_) ;
+            auto v2 = m.transform(block.arg2_, block.arg3_) ;
+            auto v3 = m.transform(block.arg4_, block.arg5_) ;
+            res.cmds_.emplace_back(block.cmd_, v1.x(), v1.y(), v2.x(), v2.y(), v3.x(), v3.y()) ;
+            break ;
+        }
+        case ClosePathCmd:
+            res.cmds_.emplace_back(block.cmd_) ;
+            break ;
+        }
+
+    }
+
+    return res ;
+}
+
+inline void extent_box(double &minx, double &miny, double &maxx, double &maxy, double px, double py) {
+    minx = std::min(minx, px) ;
+    miny = std::min(miny, py) ;
+    maxx = std::max(maxx, px) ;
+    maxy = std::max(maxy, py) ;
+}
+
+Rectangle2d Path::extents() const
+{
+    double minx = std::numeric_limits<double>::max() ;
+    double miny = std::numeric_limits<double>::max() ;
+
+    double maxx = -std::numeric_limits<double>::max() ;
+    double maxy = -std::numeric_limits<double>::max() ;
+
+    for ( const CommandBlock &block: cmds_ ) {
+
+        switch ( block.cmd_ ) {
+        case MoveToCmd:
+        case LineToCmd:
+            extent_box(minx, miny, maxx, maxy, block.arg0_, block.arg1_) ;
+            break ;
+        case CurveToCmd:
+            extent_box(minx, miny, maxx, maxy, block.arg0_, block.arg1_) ;
+            extent_box(minx, miny, maxx, maxy, block.arg2_, block.arg3_) ;
+            extent_box(minx, miny, maxx, maxy, block.arg4_, block.arg5_) ;
+            break ;
+        }
+    }
+
+    return Rectangle2d({minx, miny}, {maxx, maxy}) ;
 }
 
 

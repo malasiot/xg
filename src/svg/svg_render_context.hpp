@@ -13,7 +13,7 @@ class RenderingContext {
 
 public:
 
-      RenderingContext(Canvas &canvas): canvas_(canvas), rendering_mode_(RenderingMode::Display) {
+      RenderingContext(Canvas &canvas, RenderingMode m = RenderingMode::Display): canvas_(canvas), rendering_mode_(m) {
           view_boxes_.push_back({0, 0, (float)canvas.width(), (float)canvas.height()}) ;
       }
 
@@ -60,10 +60,19 @@ public:
       void render(Element *e) ;
       void renderChildren(const Element &e) ;
 
+      void clip(Element &e, const Style &st);
+      void clip(Element *e) ;
+      void clipChildren(const Element &e);
+
+      void addClipPath(const Path &p) ;
+
       void setShapeAntialias(ShapeQuality aa);
       void setLinearGradientBrush(LinearGradientElement &e, float a) ;
       void setRadialGradientBrush(RadialGradientElement &e, float a) ;
       void setPatternBrush(PatternElement &e, float a) ;
+
+
+
 protected:
 
       Canvas &canvas_ ;
@@ -80,6 +89,7 @@ protected:
       std::string file_path_ ;
       float doc_width_hint_, doc_height_hint_ ;
       float dpi_x_ = 92, dpi_y_ = 92 ;
+      Path clip_path_ ;
 
 };
 

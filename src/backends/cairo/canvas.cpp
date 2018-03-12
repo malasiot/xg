@@ -260,9 +260,9 @@ void Backend::fill_stroke_shape() {
 
 void Backend::set_cairo_fill(const std::shared_ptr<Brush> &br) {
 
-    if ( br->fillRule() == EvenOddFillRule)
+    if ( br->fillRule() == FillRule::EvenOdd)
         cairo_set_fill_rule (cr_, CAIRO_FILL_RULE_EVEN_ODD);
-    else if ( br->fillRule() == NonZeroFillRule )
+    else if ( br->fillRule() == FillRule::NonZero )
         cairo_set_fill_rule (cr_, CAIRO_FILL_RULE_WINDING);
 
     if ( const auto &brush = dynamic_cast<SolidBrush *>(br.get()) )
@@ -709,9 +709,15 @@ void Canvas::setClipRect(double x0, double y0, double w, double h)
     cairo_clip(cr_) ;
 }
 
-void Canvas::setClipPath(const Path &p)
+void Canvas::setClipPath(const Path &p, FillRule rule)
 {
     path(p) ;
+
+    if ( rule == FillRule::EvenOdd )
+        cairo_set_fill_rule(cr_, CAIRO_FILL_RULE_EVEN_ODD) ;
+    else
+        cairo_set_fill_rule(cr_, CAIRO_FILL_RULE_WINDING) ;
+
     cairo_clip(cr_) ;
 }
 

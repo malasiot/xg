@@ -9,7 +9,7 @@
 
 namespace xg {
 
-enum FillRule { EvenOddFillRule, NonZeroFillRule } ;
+enum class FillRule { EvenOdd, NonZero } ;
 
 // abstract class for all brush type
 
@@ -18,7 +18,7 @@ public:
 
     virtual ~Brush() = default;
 
-    void setFillRule(FillRule rule) ;
+    void setFillRule(FillRule rule) { fill_rule_ = rule ; }
     void setFillOpacity(double opacity) { fill_opacity_ = opacity; }
 
     double fillOpacity() const { return fill_opacity_ ; }
@@ -27,7 +27,7 @@ public:
 
 protected:
 
-    Brush(): fill_rule_(EvenOddFillRule), fill_opacity_(1.0) {}
+    Brush(): fill_rule_(FillRule::EvenOdd), fill_opacity_(1.0) {}
 
 public:
 

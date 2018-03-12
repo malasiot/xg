@@ -173,10 +173,13 @@ public:
     bool is_invertible() const { return determinant() != 0.0 ; }
     double determinant() const { return m1_*m4_ - m2_*m3_ ; }
 
-    Vector2d transform(const Vector2d &v) {
-        return { v.x()*m1_ + v.y()*m3_ + m5_, v.x()*m2_ + v.y()*m4_ + m6_ } ;
+    Vector2d transform(const Vector2d &v) const {
+        return transform(v.x(), v.y()) ;
     }
 
+    Vector2d transform(double vx, double vy) const {
+        return { vx*m1_ + vy*m3_ + m5_, vx*m2_ + vy*m4_ + m6_ } ;
+    }
 
     Matrix2d& operator*=(const Matrix2d& rhs) {
         return premult(rhs) ;

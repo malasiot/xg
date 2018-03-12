@@ -5,6 +5,9 @@
 #include <memory>
 #include <vector>
 
+#include <xg/xform.hpp>
+#include <xg/rectangle.hpp>
+
 namespace xg {
 
 class PathData ;
@@ -59,9 +62,12 @@ public:
     Path & addRoundedRect(double x0, double y0, double w, double h, double xrad, double yrad) ;
     Path & addPath(const Path &other) ;
     Path & addText(const std::string &str, double x0, double y0, const Font &font) ;
+    Path &addPolygon(const std::vector<Point2d> &pts) ;
+
+    Path transformed(const Matrix2d &m) const;
 
     // path bounding box
-    void extents(double &x0, double &y0, double &x1, double &y1) const ;
+    Rectangle2d extents() const ;
 
     // return a flattened version of the path
     Path flattened() const ;
