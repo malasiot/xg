@@ -146,6 +146,29 @@ void SVGParser::end_element_handler(void *data, const char *) {
 
 void SVGParser::character_data_handler(void *data, const char *character_data, int length) {
     SVGParserContext *ctx = (SVGParserContext *)data ;
-    ctx->parser_.text_.assign(character_data, length) ;
+
+    string text ;
+    const char *p = character_data ;
+    const char *q = p + length ;
+
+    bool is_space = false, is_start = true ;
+    while ( p != q ) {
+        if ( *p == '\r' ) ;
+        else if ( *p == '\n' )  ;
+        else if ( *p == '\t' || *p == ' ') {
+            if ( !is_space ) is_space = true ;
+        }
+        else {
+            if ( is_space ) {
+                if ( !is_start ) text.push_back(' ') ;
+                is_space = false ;
+            }
+            text.push_back(*p) ;
+            is_start = false ;
+        }
+        ++p ;
+    }
+
+    if ( !text.empty() ) ctx->parser_.text_.assign(text) ;
 }
 }

@@ -826,8 +826,24 @@ void SymbolElement::parseAttributes(const Dictionary &attrs) {
 }
 
 
-void TextElement::parseAttributes(const Dictionary &a)
+void TextElement::parseAttributes(const Dictionary &attrs)
 {
+    parseElementAttributes(attrs) ;
+    parseStyleAttributes(attrs, style_) ;
+    parseTransformAttribute(attrs, trans_) ;
+
+    for( const auto &lp: attrs ) {
+        string key = lp.first, val = lp.second ;
+
+        if ( key == "x" )
+            x_ = Length::parseList(val) ;
+        else if ( key == "y" )
+            y_ = Length::parseList(val) ;
+        else if ( key == "dx" )
+            dx_ = Length::parseList(val) ;
+        else if ( key == "dy" )
+            dy_ = Length::parseList(val) ;
+    }
 
 }
 

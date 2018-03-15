@@ -433,6 +433,17 @@ Path &Path::addPolygon(const std::vector<Point2d> &pts)
     return *this ;
 }
 
+Path &Path::addPolyline(const std::vector<Point2d> &pts)
+{
+    if ( pts.size() < 2 ) return *this ;
+    moveTo(pts[0].x(), pts[0].y()) ;
+    for( uint i=1 ; i<pts.size() ; i++ )
+        lineTo(pts[i].x(), pts[i].y()) ;
+
+    return *this ;
+
+}
+
 Path Path::transformed(const Matrix2d &m) const
 {
     Path res ;

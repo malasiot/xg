@@ -486,13 +486,19 @@ public:
     bool preserve_white_{false} ;
 } ;
 
+enum class LengthAdjust { Spacing, GlyphsAndSpacing } ;
 
-class TextElement: public Container<TextElement, TextSpanElement>, public TextPosElement, public Transformable {
+class TextElement: public Container<TextElement, TextSpanElement>, public Stylable, public Transformable {
 public:
 
     TextElement() {}
 
     void parseAttributes(const Dictionary &a) ;
+
+    std::vector<Length> x_, y_, dx_, dy_ ;
+    std::vector<double> rotate_ ;
+    OptionalAttribute<Length> text_length_{0} ;
+    LengthAdjust adjust_ = LengthAdjust::Spacing ;
 } ;
 
 

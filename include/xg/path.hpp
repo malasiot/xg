@@ -67,6 +67,7 @@ public:
 
 
     Path &addPolygon(const std::vector<Point2d> &pts) ;
+    Path &addPolyline(const std::vector<Point2d> &pts) ;
 
     Path transformed(const Matrix2d &m) const;
 

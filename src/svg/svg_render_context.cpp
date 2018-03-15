@@ -458,13 +458,7 @@ void RenderingContext::postRenderShape()
 
 void RenderingContext::applyClipPath(ClipPathElement *cp)
 {
-    ImageCanvas clipCanvas(canvas_.width(), canvas_.height()) ;
-    clipCanvas.setBrush(SolidBrush(Color(NamedColor::black(), 0.0))) ;
-    clipCanvas.drawRect(0, 0, canvas_.width(), canvas_.height()) ;
-{
-    RenderingContext clipCtx(clipCanvas) ;
-
-    clipCanvas.setBrush(SolidBrush(NamedColor::white())) ;
+    RenderingContext clipCtx(canvas_, RenderingMode::Cliping) ;
 
     clipCtx.clip(*cp, cp->style_) ;
 
@@ -474,14 +468,32 @@ void RenderingContext::applyClipPath(ClipPathElement *cp)
     for( auto c: cp->children() ) {
         clipCtx.clip(c.get()) ;
     }
+
+    xg::FillRule fr ;
+
+    if ( cp->style_.getFillRule() == FillRule::EvenOdd )
+      fr = xg::FillRule::EvenOdd ;
+    else
+      fr = xg::FillRule::NonZero ;
+
+    canvas_.setClipPath(clipCtx.clip_path_, fr) ;
 }
-    clipCanvas.getImage().saveToPNG("/tmp/mask.png") ;
-}
 
 
 
-void RenderingContext::render(LineElement &)
+void RenderingContext::render(LineElement &e)
 {
+    double x1 = toPixels(e.x1_, LengthDirection::Horizontal) ;
+    double y1 = toPixels(e.y1_, LengthDirection::Vertical) ;
+    double x2 = toPixels(e.x2_, LengthDirection::Horizontal) ;
+    double y2 = toPixels(e.y2_, LengthDirection::Vertical) ;
+
+    if  ( rendering_mode_ == RenderingMode::Display ) {
+        preRenderShape(e, e.style_, e.trans_, Rectangle2d()) ;
+        setPaint(e) ;
+        canvas_.drawLine(x1, y1, x2, y2) ;
+        postRenderShape() ;
+    }
 
 }
 
@@ -505,8 +517,24 @@ void RenderingContext::render(PolygonElement &e)
     }
 }
 
-void RenderingContext::render(PolylineElement &)
+void RenderingContext::render(PolylineElement &e)
 {
+    const auto &pts = e.points_.points_;
+    if ( pts.size() == 0 ) return ;
+
+    Path p ;
+    p.addPolyline(pts) ;
+
+    if  ( rendering_mode_ == RenderingMode::Display ) {
+        preRenderShape(e, e.style_, e.trans_, p.extents()) ;
+        setPaint(e) ;
+        canvas_.drawPath(p) ;
+        postRenderShape() ;
+    } else {
+        pushTransform(e.trans_) ;
+        addClipPath(p) ;
+        popTransform() ;
+    }
 
 }
 
@@ -682,6 +710,11 @@ void RenderingContext::clipChildren(const Element &e)
         clip(c.get()) ;
     }
 }
+
+
+// This implementation does not comply fully to the standard in the sense that does not compute path unions
+// For most shapes just appending paths into a single path object will work correctly though
+// A test case is this one: https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/clippath.svg
 
 void RenderingContext::addClipPath(const Path &p)
 {
