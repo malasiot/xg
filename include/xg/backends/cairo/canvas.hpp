@@ -32,7 +32,6 @@ public:
      };
 
     std::stack<State> state_ ;
-    BoundingBox vbox_ ;
 
 protected:
 
@@ -46,7 +45,7 @@ protected:
     void rect_path(double x0, double y9, double w, double h) ;
     void path(const Path &path) ;
     void polyline_path(double *pts, int n, bool) ;
-    void set_object_bbox(double x0, double y0, double x1, double y1);
+
 } ;
 
 

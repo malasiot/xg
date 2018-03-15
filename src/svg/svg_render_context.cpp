@@ -458,7 +458,13 @@ void RenderingContext::postRenderShape()
 
 void RenderingContext::applyClipPath(ClipPathElement *cp)
 {
-    RenderingContext clipCtx(canvas_, RenderingMode::Cliping) ;
+    ImageCanvas clipCanvas(canvas_.width(), canvas_.height()) ;
+    clipCanvas.setBrush(SolidBrush(Color(NamedColor::black(), 0.0))) ;
+    clipCanvas.drawRect(0, 0, canvas_.width(), canvas_.height()) ;
+{
+    RenderingContext clipCtx(clipCanvas) ;
+
+    clipCanvas.setBrush(SolidBrush(NamedColor::white())) ;
 
     clipCtx.clip(*cp, cp->style_) ;
 
@@ -468,16 +474,8 @@ void RenderingContext::applyClipPath(ClipPathElement *cp)
     for( auto c: cp->children() ) {
         clipCtx.clip(c.get()) ;
     }
-
-    xg::FillRule fr ;
-
-    if ( cp->style_.getFillRule() == FillRule::EvenOdd )
-        fr = xg::FillRule::EvenOdd ;
-    else
-        fr = xg::FillRule::NonZero ;
-
-    canvas_.setClipPath(clipCtx.clip_path_, fr) ;
-
+}
+    clipCanvas.getImage().saveToPNG("/tmp/mask.png") ;
 }
 
 

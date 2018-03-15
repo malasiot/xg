@@ -1,4 +1,4 @@
-#include "text_layout.hpp"
+#include "text_layout_engine.hpp"
 #include "font_manager.hpp"
 
 #include <memory>
@@ -10,7 +10,7 @@
 using namespace std ;
 using xg::Font ;
 
-bool TextLayout::itemizeBiDi(vector<DirectionRun> &d_runs, int32_t s_begin, int32_t s_end) {
+bool TextLayoutEngine::itemizeBiDi(vector<DirectionRun> &d_runs, int32_t s_begin, int32_t s_end) {
 
     int32_t s_length = s_end - s_begin ;
     // Adapted from https://github.com/asmaAL-Bahanta/icu-BiDi-Example/blob/master/bidiExample.cpp
@@ -53,7 +53,7 @@ bool TextLayout::itemizeBiDi(vector<DirectionRun> &d_runs, int32_t s_begin, int3
 
 
 
-bool TextLayout::itemizeScript(vector<LangScriptRun> &runs) {
+bool TextLayoutEngine::itemizeScript(vector<LangScriptRun> &runs) {
 
     ScriptRun script_run(us_.getBuffer(), us_.length());
 
@@ -75,7 +75,7 @@ bool TextLayout::itemizeScript(vector<LangScriptRun> &runs) {
 }
 
 
-void TextLayout::mergeRuns(const vector<LangScriptRun> &script_runs, const vector<DirectionRun> &dir_runs, vector<TextItem> &items)
+void TextLayoutEngine::mergeRuns(const vector<LangScriptRun> &script_runs, const vector<DirectionRun> &dir_runs, vector<TextItem> &items)
 {
     for (auto &dir_run : dir_runs)
     {
@@ -114,16 +114,10 @@ void TextLayout::mergeRuns(const vector<LangScriptRun> &script_runs, const vecto
     }
 }
 
-void TextLayout::addLine(TextLine&& line)
+void TextLayoutEngine::addLine(TextLine&& line)
 {
-    if ( lines_.empty() ) {
-        line.first_line_ = true;
-    }
-
-    width_ = std::max(width_, line.width_);
-
+    width_ = std::max(width_, line.width());
     lines_.emplace_back(std::move(line));
-
 }
 
 class ICUBreakIterator {
@@ -147,7 +141,7 @@ public:
 
 } ;
 
-void TextLayout::breakLine(int32_t start, int32_t end) {
+void TextLayoutEngine::breakLine(int32_t start, int32_t end) {
 
     TextLine line(start, end);
 
@@ -211,7 +205,7 @@ void TextLayout::breakLine(int32_t start, int32_t end) {
 
 }
 
-bool TextLayout::getGlyphsAndClusters(hb_buffer_t *buffer,  GlyphCollection &glyphs) {
+bool TextLayoutEngine::getGlyphsAndClusters(hb_buffer_t *buffer,  GlyphCollection &glyphs) {
 
     unsigned num_glyphs = hb_buffer_get_length(buffer);
     if ( num_glyphs == 0 ) return false ;
@@ -265,12 +259,12 @@ bool TextLayout::getGlyphsAndClusters(hb_buffer_t *buffer,  GlyphCollection &gly
 }
 
 
-void TextLayout::clearWidths(int32_t start, int32_t end) {
+void TextLayoutEngine::clearWidths(int32_t start, int32_t end) {
     for ( int32_t i = start; i<end; ++i )
         width_map_[i] = 0 ;
 }
 
-void TextLayout::fillGlyphInfo(GlyphCollection &glyphs, TextLine &line)
+void TextLayoutEngine::fillGlyphInfo(GlyphCollection &glyphs, TextLine &line)
 {
 
     // iterate all clusters
@@ -287,27 +281,28 @@ void TextLayout::fillGlyphInfo(GlyphCollection &glyphs, TextLine &line)
             auto const& glyph = info.glyph_ ;
 
             unsigned char_index = glyph.cluster;
-            Glyph g(glyph.codepoint, char_index);
+            Glyph g(glyph.codepoint);
 
-            g.advance_ = gpos.x_advance/64.0 ;
+            g.x_advance_ = gpos.x_advance/64.0 ;
+            g.y_advance_ = gpos.y_advance/64.0 ;
             g.x_offset_ = gpos.x_offset/64.0;
             g.y_offset_ = gpos.y_offset/64.0 ;
 
-            width_map_[char_index] += g.advance_  ;
+            width_map_[char_index] += g.x_advance_  ;
 
             line.addGlyph(std::move(g)) ;
         }
     }
 }
 
-void TextLayout::makeCairoGlyphsAndMetrics(TextLine &line) {
+void TextLayoutEngine::makeCairoGlyphsAndMetrics(TextLine &line) {
 
     cairo_font_extents_t f_extents ;
     cairo_scaled_font_extents (font_, &f_extents);
 
     line.height_ = f_extents.height ;
 
-    uint num_glyphs = line.glyph_info_.size() ;
+    uint num_glyphs = line.glyphs_.size() ;
 
     double x = 0, y = 0 ;
     cairo_glyph_t *cairo_glyphs = cairo_glyph_allocate (num_glyphs + 1);
@@ -315,11 +310,11 @@ void TextLayout::makeCairoGlyphsAndMetrics(TextLine &line) {
     unsigned i ;
 
     for (i=0; i<num_glyphs; i++) {
-        cairo_glyphs[i].index = line.glyph_info_[i].glyph_index_ ;
-        cairo_glyphs[i].x = x + line.glyph_info_[i].x_offset_ ;
-        cairo_glyphs[i].y = y - line.glyph_info_[i].y_offset_ ;
+        cairo_glyphs[i].index = line.glyphs_[i].index_ ;
+        cairo_glyphs[i].x = x + line.glyphs_[i].x_offset_ ;
+        cairo_glyphs[i].y = y - line.glyphs_[i].y_offset_ ;
 
-        x +=  line.glyph_info_[i].advance_;
+        x +=  line.glyphs_[i].x_advance_;
     }
 
     cairo_text_extents_t extents ;
@@ -328,12 +323,12 @@ void TextLayout::makeCairoGlyphsAndMetrics(TextLine &line) {
     double ascent = -extents.y_bearing ;
     double descent = extents.height + extents.y_bearing ;
 
-    line.glyphs_ = cairo_glyphs ;
+ //   line.glyphs_ = cairo_glyphs ;
     line.ascent_ = ascent ;
     line.descent_ = descent ;
 }
 
-bool TextLayout::shape(TextLine &line)
+bool TextLayoutEngine::shape(TextLine &line)
 {
     unsigned start = line.first_ ;
     unsigned end = line.last_ ;
@@ -347,7 +342,7 @@ bool TextLayout::shape(TextLine &line)
 
     // prepare HarfBuzz shaping engine
 
-    line.glyph_info_.reserve(length);
+    line.glyphs_.reserve(length);
 
     auto hb_buffer_deleter = [](hb_buffer_t * buffer) { hb_buffer_destroy(buffer);};
     const std::unique_ptr<hb_buffer_t, decltype(hb_buffer_deleter)> buffer(hb_buffer_create(), hb_buffer_deleter);
@@ -398,12 +393,18 @@ bool TextLayout::shape(TextLine &line)
 
 }
 
-bool TextLayout::itemize(int32_t start, int32_t end, vector<TextItem> &items) {
+bool TextLayoutEngine::itemize(int32_t start, int32_t end, vector<TextItem> &items) {
     using namespace icu ;
 
     // itemize directions
     vector<DirectionRun> dir_runs ;
-    if ( !itemizeBiDi(dir_runs, start, end) ) return false ;
+    if ( bidi_mode_ == xg::TextDirection::Auto ) {
+        if ( !itemizeBiDi(dir_runs, start, end) ) return false ;
+    } else if ( bidi_mode_ == xg::TextDirection::LeftToRight ) {
+        dir_runs.emplace_back(HB_DIRECTION_LTR, start, end) ;
+    } else {
+        dir_runs.emplace_back(HB_DIRECTION_RTL, start, end) ;
+    }
 
     // itemize scripts
     vector<LangScriptRun> script_runs ;
@@ -415,12 +416,21 @@ bool TextLayout::itemize(int32_t start, int32_t end, vector<TextItem> &items) {
 }
 
 
-TextLayout::TextLayout(const string &text, cairo_scaled_font_t *font, double width): font_(font), wrap_width_(width) {
+TextLayoutEngine::TextLayoutEngine(const string &text, const Font &f) {
+    font_ =  FontManager::instance().createFont(f) ;
     us_ = UnicodeString::fromUTF8(text) ;
 }
 
+void TextLayoutEngine::setWrapWidth(double w) {
+    wrap_width_ = w ;
+}
 
-bool TextLayout::run() {
+TextLayoutEngine::~TextLayoutEngine() {
+    cairo_scaled_font_destroy(font_) ;
+}
+
+
+bool TextLayoutEngine::run() {
     int32_t start = 0, end = 0;
 
     while ( (end = us_.indexOf('\n', start)) > 0 ) {
@@ -435,7 +445,7 @@ bool TextLayout::run() {
     return true ;
 }
 
-void TextLayout::computeHeight()
+void TextLayoutEngine::computeHeight()
 {
     height_ = 0 ;
 

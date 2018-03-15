@@ -7,6 +7,7 @@
 
 #include <xg/xform.hpp>
 #include <xg/rectangle.hpp>
+#include <xg/glyph.hpp>
 
 namespace xg {
 
@@ -62,6 +63,9 @@ public:
     Path & addRoundedRect(double x0, double y0, double w, double h, double xrad, double yrad) ;
     Path & addPath(const Path &other) ;
     Path & addText(const std::string &str, double x0, double y0, const Font &font) ;
+    Path & addGlyphs(const std::vector<Glyph> &glyphs, const std::vector<Point2d> &pos, const Font &font) ;
+
+
     Path &addPolygon(const std::vector<Point2d> &pts) ;
 
     Path transformed(const Matrix2d &m) const;

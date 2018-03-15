@@ -3,13 +3,16 @@ SET ( XG_FILES
     ${SRC_ROOT}/pen.cpp
     ${SRC_ROOT}/color.cpp
     ${SRC_ROOT}/image.cpp
+    ${SRC_ROOT}/text_layout.cpp
 
     ${SRC_ROOT}/backends/cairo/canvas.cpp
-    ${SRC_ROOT}/backends/cairo/text_layout.cpp
-    ${SRC_ROOT}/backends/cairo/text_layout.hpp
+    ${SRC_ROOT}/backends/cairo/text_layout_engine.cpp
+    ${SRC_ROOT}/backends/cairo/text_layout_engine.hpp
     ${SRC_ROOT}/backends/cairo/font_manager.cpp
     ${SRC_ROOT}/backends/cairo/font_manager.hpp
     ${SRC_ROOT}/backends/cairo/scrptrun.cpp
+    ${SRC_ROOT}/backends/cairo/text_path.cpp
+
     ${INCLUDE_ROOT}/backends/cairo/canvas.hpp
 
     ${INCLUDE_ROOT}/font.hpp
@@ -19,6 +22,8 @@ SET ( XG_FILES
     ${INCLUDE_ROOT}/vector.hpp
     ${INCLUDE_ROOT}/rectangle.hpp
     ${INCLUDE_ROOT}/xform.hpp
+    ${INCLUDE_ROOT}/text_layout.hpp
+    ${INCLUDE_ROOT}/glyph.hpp
 
     ${INCLUDE_ROOT}/util/variant.hpp
     ${INCLUDE_ROOT}/util/dictionary.hpp

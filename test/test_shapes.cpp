@@ -10,16 +10,15 @@ void drawShape(Canvas &canvas, const Rectangle2d &rect) {
     canvas.drawRect(rect) ;
     canvas.drawLine(rect.topLeft(), rect.bottomRight()) ;
     canvas.drawLine(rect.bottomLeft(), rect.topRight()) ;
+
+    Path p ;
+    p.addText("Hello", rect.x(), rect.y(), Font("Arial", 12)) ;
+    canvas.drawPath(p) ;
 }
 
 int main(int argc, char *argv[]) {
 
     ImageCanvas canvas(1024, 512) ;
-
-    Path p ;
-    p.addEllipse(10, 10, 80, 80) ;
-    p.addEllipse(100, 100, 80, 80) ;
-    canvas.setClipPath(p) ;
 
     canvas.setPen(Pen()) ;
     canvas.setBrush(SolidBrush(NamedColor::blue())) ;

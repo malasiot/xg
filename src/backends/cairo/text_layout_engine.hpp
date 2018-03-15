@@ -1,7 +1,9 @@
-#ifndef __TEXT_LAYOUT_HPP__
-#define __TEXT_LAYOUT_HPP__
+#ifndef __XG_TEXT_LAYOUT_ENGINE_HPP__
+#define __XG_TEXT_LAYOUT_ENGINE_HPP__
 
 #include <xg/font.hpp>
+#include <xg/text_layout.hpp>
+#include <xg/glyph.hpp>
 
 #include <harfbuzz/hb.h>
 #include <harfbuzz/hb-ft.h>
@@ -15,68 +17,23 @@
 #include <string>
 #include <map>
 
-struct Glyph {
+using xg::Glyph ;
+using xg::TextLine ;
 
-    Glyph(unsigned cp, unsigned c_index): glyph_index_(cp), char_index_(c_index) {}
-
-    unsigned glyph_index_;
-    unsigned char_index_;
-    double advance_;
-    double x_offset_, y_offset_ ;
-};
-
-struct TextLine {
-
-    TextLine(int32_t first, int32_t last): first_(first), last_(last) {}
-    ~TextLine() {
-    //    if ( glyphs_ ) cairo_glyph_free(glyphs_) ;
-    }
-
-    void addGlyph(Glyph && glyph)  {
-        double advance = glyph.advance_ ;
-
-        if ( glyph_info_.empty() )
-        {
-            width_ = advance;
-            glyphs_width_ = advance;
-            space_count_ = 0;
-        }
-        else if ( advance > 0 )
-        {
-            // Only add character spacing if the character is not a zero-width part of a cluster.
-            width_ += advance ;
-            glyphs_width_ += advance;
-            ++space_count_;
-        }
-        glyph_info_.emplace_back(std::move(glyph));
-    }
-
-    unsigned numGlyphs() const { return glyph_info_.size() ; }
-
-    double height_ = 0 ; // font height
-    double width_; // line width
-    double ascent_, descent_ ;
-    double glyphs_width_;
-
-    int32_t first_;
-    int32_t last_;
-    bool first_line_ = false ;
-    unsigned space_count_ = 0 ;
-    std::vector<Glyph> glyph_info_ ;
-    cairo_glyph_t *glyphs_ = nullptr ;
-    double base_line_ = 0 ;
-} ;
-
-class TextLayout {
+class TextLayoutEngine {
 public:
-    TextLayout(const std::string &text, cairo_scaled_font_t *sf, double wrap = -1) ;
+    TextLayoutEngine(const std::string &text, const xg::Font &f) ;
 
+    void setWrapWidth(double w) ;
+    void setTextDirection(xg::TextDirection dir) { bidi_mode_ = dir ; }
     bool run() ;
 
     const std::vector<TextLine> &lines() const { return lines_ ; }
 
     double width() const { return width_ ; }
     double height() const { return height_ ; }
+
+    ~TextLayoutEngine();
 
 private:
 
@@ -126,7 +83,7 @@ private:
     UnicodeString us_ ;
     cairo_scaled_font_t *font_ ;
     std::map<unsigned,double> width_map_ ;
-    double wrap_width_ ;
+    double wrap_width_ = -1 ;
 
     std::vector<TextLine> lines_ ;
     double width_ = 0, height_ = 0 ;
@@ -134,9 +91,10 @@ private:
     char wrap_char_ = ' ';
     bool wrap_before_ = true ;
     bool repeat_wrap_char_ = false;
-
+    xg::TextDirection bidi_mode_ = xg::TextDirection::Auto;
 
 
 } ;
+
 
 #endif

@@ -13,7 +13,7 @@
 #include <fontconfig/fcfreetype.h>
 #include <harfbuzz/hb.h>
 #include <harfbuzz/hb-ft.h>
-#include "text_layout.hpp"
+#include "text_layout_engine.hpp"
 #include "font_manager.hpp"
 
 #endif
@@ -167,75 +167,6 @@ void Backend::cairo_apply_pattern(const PatternBrush &pat) {
 
     cairo_pattern_destroy (pattern);
 }
-/*
-void Backend::cairo_apply_pattern(const PatternBrush &pat)
-{
-    cairo_t *cr = (cairo_t *)cr_, *cr_pattern;
-    cairo_pattern_t *pattern;
-
-    double sw = pat.surf_.width_, sh = pat.surf_.height_ ;
-
-    double width, height, x = 0.0, y = 0.0 ;
-
-    if (pat.pu_ == PatternBrush::ObjectBoundingBox )
-    {
-        width = sw * vboxw ;
-        height = sh * vboxh ;
-        x = vboxx ;
-        y = vboxy ;
-    }
-    else
-    {
-        width = sw ;
-        height = sh ;
-    }
-
-    if ( width == 0.0 || height == 0.0 ) return ;
-
-    cairo_surface_t *surface = cairo_surface_create_similar (cairo_get_target (cr),
-                                                                 CAIRO_CONTENT_COLOR_ALPHA, width, height);
-    cr_pattern = cairo_create (surface);
-
-    cairo_save(cr_pattern) ;
-
-    if (pat.pu_ == PatternBrush::ObjectBoundingBox )
-    {
-        cairo_matrix_t bboxmatrix;
-        cairo_matrix_init (&bboxmatrix, vboxw, 0, 0, vboxh, 0, 0);
-        cairo_transform(cr_pattern, &bboxmatrix)  ;
-    }
-
-    // replay pattern recording surface
-
-    cairo_set_source_surface (cr_pattern, (cairo_surface_t *)pat.surf_.handle_, 0.0, 0.0);
-    if ( pat.fill_opacity_ == 1.0 ) cairo_paint (cr_pattern);
-    else cairo_paint_with_alpha(cr_pattern, pat.fill_opacity_);
-
-    cairo_restore(cr_pattern) ;
-
-  //  cairo_surface_write_to_png(surface, "/tmp/ff.png") ;
-
-    pattern = cairo_pattern_create_for_surface (surface);
-    cairo_pattern_set_extend (pattern, CAIRO_EXTEND_REPEAT);
-
-    cairo_matrix_t patm;
-    cairo_matrix_init(&patm,pat.tr_.m[0],pat.tr_.m[1],
-           pat.tr_.m[2],pat.tr_.m[3],
-           pat.tr_.m[4],pat.tr_.m[5]) ;
-
-//    cairo_matrix_invert(&patm) ;
-
-    cairo_pattern_set_matrix (pattern, &patm);
-    cairo_pattern_set_filter (pattern, CAIRO_FILTER_BEST); //?
-
-    cairo_set_source (cr, pattern);
-
-    cairo_pattern_destroy (pattern);
-    cairo_destroy (cr_pattern);
-    cairo_surface_destroy (surface);
-
-}
-*/
 
 void Backend::fill_stroke_shape() {
 
@@ -295,17 +226,8 @@ void Backend::polyline_path(double *pts, int n, bool close) {
         cairo_line_to(cr_, pts[k], pts[k+1]) ;
 
     if ( close ) cairo_close_path(cr_) ;
-
-    double x0, y0, x1, y1 ;
-    cairo_path_extents(cr_, &x0, &y0, &x1, &y1) ;
-    set_object_bbox(x0, y0, x1, y1) ;
 }
 
-
-void Backend::set_object_bbox(double x0, double y0, double x1, double y1) {
-    vbox_.extend(x0, y0);
-    vbox_.extend(x1, y1);
-}
 
 
 void Backend::path(const Path &path) {
@@ -329,19 +251,14 @@ void Backend::path(const Path &path) {
             break ;
         }
     }
-
-    double x0, y0, x1, y1 ;
-    cairo_path_extents(cr_, &x0, &y0, &x1, &y1) ;
-    set_object_bbox(x0, y0, x1, y1) ;
 }
 
 
 void Backend::rect_path(double x0, double y0, double w, double h) {
     cairo_rectangle(cr_, x0, y0, w, h);
-    set_object_bbox(x0, y0, x0+w, y0+h) ;
-}
+ }
 
-
+#if 0
 const hb_tag_t KernTag = HB_TAG('k', 'e', 'r', 'n'); // kerning operations
 static hb_feature_t KerningOn = { KernTag, 1, 0, std::numeric_limits<unsigned int>::max() };
 
@@ -394,7 +311,7 @@ static bool shape_text(const std::string &text, cairo_scaled_font_t *sf, cairo_g
 
     hb_buffer_destroy(buffer) ;
 }
-
+#endif
 cairo_surface_t *cairo_create_image_surface(const Image &im)
 {
     cairo_surface_t *psurf ;
@@ -472,21 +389,6 @@ cairo_surface_t *cairo_create_image_surface(const Image &im)
 }
 
 
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/*
-void Backend::cairo_apply_font(const Font &font) {
-    cairo_font_face_t *font_face = CairoFontFaceCache::instance().query_font_face_fc(font.family(), font.style(), font.weight()) ;
-
-    cairo_set_font_face(cr_, font_face) ;
-    cairo_set_font_size(cr_, font.size()) ;
-}
-*/
-
 Backend::~Backend() {
     cairo_surface_finish (surf_);
     cairo_surface_destroy (surf_);
@@ -547,10 +449,10 @@ void Canvas::drawText(const std::string &text, double x0, double y0, double widt
 
     cairo_scaled_font_t *scaled_font = FontManager::instance().createFont(f) ;
 
-    cairo_set_scaled_font(cr_, scaled_font) ;
+    TextLayout layout(text, f) ;
+    layout.setWrapWidth(width) ;
 
-    TextLayout layout(text, scaled_font, width) ;
-    layout.run() ;
+    layout.compute() ;
 
     double y = 0, tx = 0, ty = 0 ;
 
@@ -559,21 +461,37 @@ void Canvas::drawText(const std::string &text, double x0, double y0, double widt
     else if ( flags & TextAlignBottom )
         ty = height - layout.height()  ;
 
+    bool is_first_line = true ;
+
     for (const TextLine &line: layout.lines() ) {
 
         if ( flags & TextAlignHCenter )
-            tx =  ( width - line.width_ )/2.0 ;
+            tx =  ( width - line.width() )/2.0 ;
         else if ( flags & TextAlignRight )
-            tx =  width - line.width_;
+            tx =  width - line.width();
 
-        if ( line.first_line_ )
-            y += line.ascent_ ;
+        if ( is_first_line ) {
+            y += line.ascent() ;
+            is_first_line = false ;
+        }
 
         unsigned num_glyphs = line.numGlyphs() ;
 
-        cairo_glyph_t *cairo_glyphs = line.glyphs_ ;
+        double gx = 0 ;
+        cairo_glyph_t *cairo_glyphs = cairo_glyph_allocate (num_glyphs + 1);
+
+        for ( unsigned i=0; i<num_glyphs; i++) {
+            const Glyph &g = line.glyphs()[i] ;
+            cairo_glyphs[i].index = g.index_ ;
+            cairo_glyphs[i].x = gx + g.x_offset_ ;
+            cairo_glyphs[i].y =  - g.y_offset_ ;
+
+            gx +=  g.x_advance_;
+        }
 
         cairo_save(cr_) ;
+
+        cairo_set_scaled_font(cr_, scaled_font) ;
 
         cairo_translate(cr_, x0 + tx, y0 + y + ty) ;
 
@@ -588,7 +506,7 @@ void Canvas::drawText(const std::string &text, double x0, double y0, double widt
         cairo_rectangle(cr_, 0, 0, layout.width(), line.descent_) ;
 #endif
 
-        y += line.height_ ;
+        y += line.height() ;
 #if 0
         cairo_set_source_rgb(cr_, 1, 0, 0) ;
 
@@ -596,104 +514,75 @@ void Canvas::drawText(const std::string &text, double x0, double y0, double widt
 #endif
         cairo_restore(cr_) ;
 
+        cairo_glyph_free(cairo_glyphs) ;
+
     }
 
-
-#if 0
-    cairo_scaled_font_t *scaled_font = FontManager::instance().createFont(f) ;
-
-    if ( !scaled_font ) return ;
-
-    cairo_set_scaled_font(cr_, scaled_font) ;
-
-    // do text shaping based on created font
-
-    cairo_glyph_t *glyphs ;
-    int num_glyphs =0 ;
-
-    if ( !detail::shape_text(text, scaled_font, glyphs, num_glyphs) ) return ;
-
-    // compute text placement
-
-    cairo_text_extents_t extents ;
-
-    cairo_glyph_extents(cr_, glyphs, num_glyphs, &extents);
-
-    cairo_save(cr_) ;
-
-    double tx, ty, tw = extents.width, th = extents.height ;
-
-    if ( flags & TextAlignHCenter )
-        tx = x0 + (width - tw - extents.x_bearing)/2.0 ;
-    else if ( flags & TextAlignRight )
-        tx = x0 + width - tw - extents.x_bearing;
-    else
-        tx = x0 - extents.x_bearing ;
-
-    if ( flags & TextAlignTop )
-        ty = y0 - extents.y_bearing;
-    else if ( flags & TextAlignVCenter )
-        ty = y0 - (th + extents.y_bearing) + ( height + th )/2;
-    else if ( flags & TextAlignBaseline )
-        ty = y0 + height ;
-    else
-        ty = y0 + height  - ( th + extents.y_bearing );
-
-    cairo_save(cr_) ;
-
-    cairo_translate(cr_, tx, ty) ;
-
-    cairo_glyph_path(cr_, glyphs, num_glyphs);
-
-    fill_stroke_shape() ;
-
-    cairo_rectangle(cr_, 0, 0, tw, th) ;
-
-    cairo_set_source_rgb(cr_, 1, 0, 0) ;
-
-    cairo_restore(cr_) ;
-#endif
+     cairo_scaled_font_destroy(scaled_font) ;
 }
 
+void Canvas::drawText(const string &textStr, const Point2d &p) {
+    drawText(textStr, p.x(), p.y()) ;
+}
 
+void Canvas::drawText(const string &textStr, const Rectangle2d &r, unsigned int flags) {
+    drawText(textStr, r.x(), r.y(), r.width(), r.height(), flags) ;
+}
 
-void Canvas::drawText(const string &str, double x0, double y0)
+void Canvas::drawText(const std::string &text, double x0, double y0)
 {
     const Font &f = state_.top().font_ ;
+
+
+    TextLayout layout(text, f) ;
+
+    layout.compute() ;
+
+    const TextLine &line = layout.lines()[0] ;
+
+    unsigned num_glyphs = line.numGlyphs() ;
+
+
+    double gx = 0 ;
+    cairo_glyph_t *cairo_glyphs = cairo_glyph_allocate (num_glyphs + 1);
+
+    for ( unsigned i=0; i<num_glyphs; i++) {
+        const Glyph &g = line.glyphs()[i] ;
+        cairo_glyphs[i].index = g.index_ ;
+        cairo_glyphs[i].x = gx + g.x_offset_ ;
+        cairo_glyphs[i].y =  - g.y_offset_ ;
+
+        gx +=  g.x_advance_;
+    }
+
     cairo_scaled_font_t *scaled_font = FontManager::instance().createFont(f) ;
-
-    if ( !scaled_font ) return ;
-
-    cairo_set_scaled_font(cr_, scaled_font) ;
-
-    // do text shaping based on created font
-
-    cairo_glyph_t *glyphs ;
-    int num_glyphs =0 ;
-
-    if ( !detail::shape_text(str, scaled_font, glyphs, num_glyphs) ) return ;
-
-    // compute text placement
-
-    cairo_text_extents_t extents ;
-
-    cairo_glyph_extents(cr_, glyphs, num_glyphs, &extents);
+     cairo_set_scaled_font(cr_, scaled_font) ;
 
     cairo_save(cr_) ;
 
-    cairo_translate(cr_, x0 + extents.x_bearing, y0) ;
 
-    cairo_glyph_path(cr_, glyphs, num_glyphs);
+    cairo_translate(cr_, x0, y0) ;
 
-    fill_stroke_shape() ;
+    cairo_glyph_path(cr_, cairo_glyphs, num_glyphs);
 
-    cairo_rectangle(cr_, 0, 0, extents.width,  extents.y_bearing) ;
+    cairo_fill(cr_) ;
+#if 0
+        cairo_rectangle(cr_, 0, 0, layout.width(), -line.ascent_) ;
+        cairo_rectangle(cr_, 0, 0, layout.width(), line.descent_) ;
+#endif
 
-    cairo_set_source_rgb(cr_, 1, 0, 0) ;
-    cairo_stroke(cr_) ;
+#if 0
+        cairo_set_source_rgb(cr_, 1, 0, 0) ;
 
+        cairo_stroke(cr_) ;
+#endif
     cairo_restore(cr_) ;
+
+    cairo_glyph_free(cairo_glyphs) ;
+
+    cairo_scaled_font_destroy(scaled_font) ;
 }
+
 
 
 static void cairo_push_transform(cairo_t *cr, const Matrix2d &a)
@@ -825,6 +714,7 @@ void Canvas::drawEllipse(double xp, double yp, double rxp, double ryp) {
     fill_stroke_shape() ;
 }
 
+
 Canvas::Canvas(double width, double height, double dpix, double dpiy): width_(width), height_(height), dpi_x_(dpix), dpi_y_(dpiy) {
 }
 
@@ -881,79 +771,9 @@ void Canvas::drawImage(const Image &im,  double opacity )
 }
 
 
-/*
-Backend &Backend::drawImage(const std::string &pngImageFile, double x0, double y0, double w, double h, ViewBoxPolicy policy, ViewBoxAlign align,
-                        double opacity )
-{
-    cairo_t *cr = (cairo_t *)cr_  ;
-
-    cairo_surface_t *imsurf = cairo_image_surface_create_from_png(pngImageFile.c_str()) ;
-
-    int width = cairo_image_surface_get_width(imsurf) ;
-    int height = cairo_image_surface_get_height(imsurf) ;
-
-    Transform trs = getViewBoxTransform(w, h, width, height, 0, 0, policy, align ) ;
-
-    cairo_save(cr) ;
-
-    cairo_translate(cr, x0, y0) ;
-    cairo_push_transform(cr, trs) ;
-
-    cairo_set_source_surface(cr, (cairo_surface_t *)imsurf, 0, 0);
-
-    set_object_bbox(x0, y0, w, h) ;
-
-    cairo_paint_with_alpha (cr, opacity);
-    cairo_restore(cr) ;
-
-    cairo_surface_destroy(imsurf) ;
-
-    return *this ;
-
-}
-
-cv::Mat ImageSurface::getImage(bool transparency) const {
-
-    cairo_surface_t *imsurf = (cairo_surface_t *)handle_ ;
-    int width = cairo_image_surface_get_width(imsurf) ;
-    int height = cairo_image_surface_get_height(imsurf) ;
-
-    cv::Mat res(height, width, (transparency ) ? CV_8UC4: CV_8UC3) ;
-
-    int dstride = res.step[0] ;
-
-    unsigned char *data = cairo_image_surface_get_data(imsurf) ;
-    int sstride = cairo_image_surface_get_stride(imsurf);
-
-    unsigned char *dp, *drp = (unsigned char *)res.data ;
-    unsigned char *sp, *srp = (unsigned char *)data ;
-
-    for (int i = 0; i < height; i++)
-    {
-        dp = drp; sp = srp ;
-
-        for (int j = 0; j < width; j++)
-        {
-            uint32_t val = *((uint32_t *)sp) ;
-            *dp++ = ( val ) & 0xff ; *dp++ = ( val >> 8 ) & 0xff ;
-            *dp++ = ( val >> 16 ) & 0xff ;
-
-            if ( transparency ) *dp++ = ( val >> 24 ) & 0xff ;
-            sp += 4 ;
-        }
-
-        drp += dstride ;
-        srp += sstride ;
-    }
-
-
-    return res ;
-}
-*/
 void Canvas::setTransform(const Matrix2d &tr) {
     cairo_push_transform(cr_, tr) ;
 }
-
 
 void Canvas::setAntialias(bool anti_alias)
 {
@@ -968,10 +788,6 @@ PatternCanvas::PatternCanvas(double width, double height): Canvas(width, height,
     surf_ = cairo_recording_surface_create(CAIRO_CONTENT_COLOR_ALPHA, &r) ;
     cr_ = cairo_create(surf_) ;
 }
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
 
 
 } // namespace xg

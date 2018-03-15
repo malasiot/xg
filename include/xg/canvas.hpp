@@ -12,6 +12,7 @@
 #include <xg/font.hpp>
 #include <xg/image.hpp>
 #include <xg/rectangle.hpp>
+#include <xg/glyph.hpp>
 #include <xg/svg_document.hpp>
 
 #include <xg/backends/cairo/canvas.hpp>
@@ -67,6 +68,11 @@ public:
 
     void drawText(const std::string &textStr, double x0, double y0) ;
     void drawText(const std::string &textStr, double x0, double y0, double width, double height, unsigned int flags) ;
+    void drawText(const std::string &textStr, const Point2d &p) ;
+    void drawText(const std::string &textStr, const Rectangle2d &r, unsigned int flags) ;
+
+    void drawGlyph(const Glyph &g, const Point2d &p) ;
+    void drawGlyphs(const std::vector<Glyph> &glyphs, const std::vector<Point2d> &positions) ;
 
     void drawImage(const Image &im,  double opacity) ;
 
