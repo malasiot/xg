@@ -44,12 +44,15 @@ protected:
 
     void beginElement(const std::string &name, const Dictionary &attributes) ;
     void endElement() ;
+    void characters(const std::string &name) ;
 
 private:
 
     static void start_element_handler(void *data, const char *element_name, const char **attributes) ;
     static void end_element_handler(void *data, const char *elelemnt_name);
     static void character_data_handler(void *data, const char *character_data, int length);
+
+    std::string processWhiteSpace(const char *character_data, int length);
 
 private:
 
@@ -59,7 +62,6 @@ private:
     std::deque<std::shared_ptr<svg::Element>> nodes_ ;
     std::deque<std::string> elements_ ;
     svg::SVGElement *root_ = nullptr;
-
 };
 
 

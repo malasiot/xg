@@ -258,60 +258,6 @@ void Backend::rect_path(double x0, double y0, double w, double h) {
     cairo_rectangle(cr_, x0, y0, w, h);
  }
 
-#if 0
-const hb_tag_t KernTag = HB_TAG('k', 'e', 'r', 'n'); // kerning operations
-static hb_feature_t KerningOn = { KernTag, 1, 0, std::numeric_limits<unsigned int>::max() };
-
-hb_feature_t hb_features[] = { KerningOn } ;
-
-static bool shape_text(const std::string &text, cairo_scaled_font_t *sf, cairo_glyph_t *&cglyphs, int &num_glyphs, const std::string &lang = "en")
-{
-    hb_buffer_t *buffer = hb_buffer_create();
-    hb_buffer_set_unicode_funcs(buffer, hb_unicode_funcs_get_default());
-
-    size_t len = text.length() ;
-
-    hb_buffer_set_direction(buffer, HB_DIRECTION_LTR) ;
-    hb_buffer_set_script(buffer, HB_SCRIPT_COMMON);
-    hb_buffer_set_language(buffer, hb_language_from_string(lang.c_str(), -1)) ;
-    hb_buffer_add_utf8(buffer, text.c_str(), len, 0, len);
-
-    FT_Face face = cairo_ft_scaled_font_lock_face(sf) ;
-
-    if ( face == 0 ) return false ;
-
-    hb_font_t *font = hb_ft_font_create(face, NULL);
-
-    hb_shape(font, buffer, hb_features, 1);
-
-    hb_font_destroy(font);
-
-    cairo_ft_scaled_font_unlock_face(sf) ;
-
-    num_glyphs = hb_buffer_get_length(buffer);
-
-    hb_glyph_info_t *glyphs = hb_buffer_get_glyph_infos(buffer, NULL);
-    hb_glyph_position_t *positions = hb_buffer_get_glyph_positions(buffer, NULL);
-
-    double x = 0, y = 0 ;
-
-    cairo_glyph_t *cairo_glyphs = cairo_glyph_allocate (num_glyphs + 1);
-
-    for (unsigned i=0; i<num_glyphs; i++)
-    {
-        cairo_glyphs[i].index = glyphs[i].codepoint ;
-        cairo_glyphs[i].x = x + (positions[i].x_offset/64);
-        cairo_glyphs[i].y = y - (positions[i].y_offset/64);
-
-        x +=  positions[i].x_advance/64;
-        y += -positions[i].y_advance/64;
-    }
-
-    cglyphs = cairo_glyphs;
-
-    hb_buffer_destroy(buffer) ;
-}
-#endif
 cairo_surface_t *cairo_create_image_surface(const Image &im)
 {
     cairo_surface_t *psurf ;
@@ -583,6 +529,41 @@ void Canvas::drawText(const std::string &text, double x0, double y0)
     cairo_scaled_font_destroy(scaled_font) ;
 }
 
+
+
+void Canvas::drawGlyphs(const vector<Glyph> &glyphs, const vector<Point2d> &gpos)
+{
+    const Font &f = state_.top().font_ ;
+
+    cairo_scaled_font_t *scaled_font = FontManager::instance().createFont(f) ;
+
+    unsigned num_glyphs = glyphs.size() ;
+
+    assert(num_glyphs == gpos.size()) ;
+
+    cairo_glyph_t *cairo_glyphs = cairo_glyph_allocate (num_glyphs + 1);
+
+    for ( unsigned i=0; i<num_glyphs; i++ ) {
+        const Glyph &g = glyphs[i] ;
+        cairo_glyphs[i].index = g.index_ ;
+        cairo_glyphs[i].x = gpos[i].x() ;
+        cairo_glyphs[i].y = gpos[i].y() ;
+    }
+
+    cairo_save(cr_) ;
+
+    cairo_set_scaled_font(cr_, scaled_font) ;
+
+    cairo_glyph_path(cr_, cairo_glyphs, num_glyphs);
+
+    fill_stroke_shape();
+
+    cairo_restore(cr_) ;
+
+    cairo_glyph_free(cairo_glyphs) ;
+
+    cairo_scaled_font_destroy(scaled_font) ;
+}
 
 
 static void cairo_push_transform(cairo_t *cr, const Matrix2d &a)

@@ -12,8 +12,8 @@ namespace xg {
 
 struct SVGParserContext {
 
-   XML_Parser expat_parser_ ;
-   SVGParser &parser_ ;
+    XML_Parser expat_parser_ ;
+    SVGParser &parser_ ;
 } ;
 
 
@@ -85,6 +85,10 @@ void SVGParser::beginElement(const string &name, const Dictionary &attributes) {
         createNode<svg::CircleElement>(attributes) ;
     else if ( name == "text" )
         createNode<svg::TextElement>(attributes) ;
+    else if ( name == "tspan" )
+        createNode<svg::TSpanElement>(attributes) ;
+    else if ( name == "tref" )
+        createNode<svg::TRefElement>(attributes) ;
     else if ( name == "defs" )
         createNode<svg::DefsElement>(attributes) ;
     else if ( name == "symbol" )
@@ -112,6 +116,15 @@ void SVGParser::beginElement(const string &name, const Dictionary &attributes) {
 void SVGParser::endElement() {
     nodes_.pop_back() ;
     elements_.pop_back() ;
+}
+
+void SVGParser::characters(const string &text) {
+    if ( auto p = std::dynamic_pointer_cast<svg::TextElement>(nodes_.back()) ) {
+        p->addChild(make_shared<svg::TSpanElement>(text)) ;
+    }
+    else if ( auto p = std::dynamic_pointer_cast<svg::TSpanElement>(nodes_.back()) ) {
+        p->text_ = text ;
+    }
 }
 
 void SVGParser::start_element_handler(void *data, const char *element_name, const char **attributes)
@@ -144,31 +157,50 @@ void SVGParser::end_element_handler(void *data, const char *) {
     ctx->parser_.endElement() ;
 }
 
+string SVGParser::processWhiteSpace(const char *character_data, int length) {
+
+    string text ;
+
+    if ( nodes_.back()->space() == svg::WhiteSpaceProcessing::Default ) {
+
+        const char *p = character_data ;
+        const char *q = p + length ;
+
+        bool is_space = false, is_start = true ;
+        while ( p != q ) {
+            if ( *p == '\r' ) ;
+            else if ( *p == '\n' )  ;
+            else if ( *p == '\t' || *p == ' ') {
+                if ( !is_space ) is_space = true ;
+            }
+            else {
+                if ( is_space ) {
+                    if ( !is_start ) text.push_back(' ') ;
+                    is_space = false ;
+                }
+                text.push_back(*p) ;
+                is_start = false ;
+            }
+            ++p ;
+        }
+    } else {
+        const char *p = character_data ;
+        const char *q = p + length ;
+
+        while ( p != q ) {
+            if ( isspace(*p) ) text.push_back(' ') ;
+            ++p ;
+        }
+    }
+
+    return text ;
+}
+
 void SVGParser::character_data_handler(void *data, const char *character_data, int length) {
     SVGParserContext *ctx = (SVGParserContext *)data ;
 
-    string text ;
-    const char *p = character_data ;
-    const char *q = p + length ;
+    string text = ctx->parser_.processWhiteSpace(character_data, length) ;
 
-    bool is_space = false, is_start = true ;
-    while ( p != q ) {
-        if ( *p == '\r' ) ;
-        else if ( *p == '\n' )  ;
-        else if ( *p == '\t' || *p == ' ') {
-            if ( !is_space ) is_space = true ;
-        }
-        else {
-            if ( is_space ) {
-                if ( !is_start ) text.push_back(' ') ;
-                is_space = false ;
-            }
-            text.push_back(*p) ;
-            is_start = false ;
-        }
-        ++p ;
-    }
-
-    if ( !text.empty() ) ctx->parser_.text_.assign(text) ;
+    if ( !text.empty() ) ctx->parser_.characters(text) ;
 }
 }

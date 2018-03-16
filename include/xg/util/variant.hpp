@@ -69,6 +69,13 @@ public:
         helper_t::copy(old.type_id_, &old.data_, &data_);
     }
 
+    Variant &operator = (const Variant<Ts...>& old) {
+        helper_t::destroy(type_id_, &data_);
+        type_id_ = old.type_id_ ;
+        helper_t::copy(old.type_id_, &old.data_, &data_);
+        return *this ;
+    }
+
 
     template <typename T, typename... Args, typename = typename std::enable_if<is_one_of<T, Ts...>::value, void>::type>
     void set(Args&&... args)  {

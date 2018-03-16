@@ -1,4 +1,5 @@
 #include "svg_render_context.hpp"
+#include <xg/text_layout.hpp>
 
 using namespace std ;
 
@@ -662,15 +663,166 @@ void RenderingContext::render(ImageElement &e) {
 
 }
 
-void RenderingContext::render(TextElement &)
+Font RenderingContext::makeFont(const Style &st)
 {
+    string f_family = st.getFontFamily() ;
+    FontStyle f_style = st.getFontStyle() ;
+    FontVariant f_variant = st.getFontVariant() ;
+    FontWeight f_weight = st.getFontWeight() ;
+    double f_size = toPixels(st.getFontSize().val_, LengthDirection::Vertical) ;
+
+    Font f(f_family, f_size) ;
+
+    switch ( f_style )
+    {
+        case FontStyle::Oblique:
+            f.setStyle(xg::FontStyle::Oblique) ;
+            break ;
+        case FontStyle::Italic:
+            f.setStyle(xg::FontStyle::Italic) ;
+            break ;
+        case FontStyle::Normal:
+            f.setStyle(xg::FontStyle::Normal) ;
+            break ;
+    }
+
+    switch ( f_weight )
+    {
+        case FontWeight::Normal:
+        case FontWeight::W100:
+        case FontWeight::W200:
+        case FontWeight::W300:
+        case FontWeight::W400:
+            f.setWeight(xg::FontWeight::Normal) ;
+            break ;
+        case FontWeight::Bold:
+        case FontWeight::Bolder:
+        case FontWeight::W500:
+        case FontWeight::W600:
+        case FontWeight::W700:
+        case FontWeight::W800:
+        case FontWeight::W900:
+            f.setWeight(xg::FontWeight::Bold) ;
+            break ;
+    }
+
+    return f ;
+}
+
+void RenderingContext::render(TextElement &e)
+{
+    pushState(e.style_) ;
+    pushTransform(e.trans_) ;
+
+    canvas_.save() ;
+    canvas_.setTransform(e.trans_);
+
+    double x, y, dx, dy ;
+
+    x = toPixels(e.x_.value(), LengthDirection::Horizontal) ;
+    y = toPixels(e.y_.value(), LengthDirection::Vertical) ;
+
+    dx = toPixels(e.dx_.value(), LengthDirection::Horizontal) ;
+    dy = toPixels(e.dy_.value(), LengthDirection::Vertical) ;
+
+    cursor_x_ = x + dx ;
+    cursor_y_ = y + dy ;
+
+    for( auto &c: e.children() ) {
+        if ( auto p = std::dynamic_pointer_cast<TSpanElement>(c) ) {
+            render(*p) ;
+        }
+        else if ( auto p = std::dynamic_pointer_cast<TRefElement>(c) ) {
+            render(*p) ;
+        }
+    }
+
+    canvas_.restore() ;
+    popTransform() ;
+    popState() ;
+}
+
+void RenderingContext::render(TSpanElement &e)
+{
+    if ( e.text_.empty() ) return ;
+
+    pushState(e.style_) ;
+
+    Style &st = states_.back() ;
+
+    double x, y, dx, dy ;
+
+    x = ( e.x_.hasValue() ) ? toPixels(e.x_.value(), LengthDirection::Horizontal) : cursor_x_ ;
+    y = ( e.y_.hasValue() ) ? toPixels(e.y_.value(), LengthDirection::Vertical) : cursor_y_ ;
+
+    dx = toPixels(e.dx_.value(), LengthDirection::Horizontal) ;
+    dy = toPixels(e.dy_.value(), LengthDirection::Vertical) ;
+
+    Font f = makeFont(st) ;
+
+    // we add a space here ?
+
+    TextLayout tl(e.text_ + ' ', f) ;
+    tl.compute() ;
+
+    /*
+    if ( st.textAnchor == Style::MiddleTextAnchor )
+           xpt -= extents.width/2 ;
+       else if ( st.textAnchor == Style::EndTextAnchor )
+           xpt -= extents.width ;
+   */
+
+    const auto &line = tl.lines()[0] ;
+
+
+    vector<Point2d> gpos ;
+
+    double gx = 0 ;
+    for ( const Glyph &g: line.glyphs() ) {
+        gpos.emplace_back(gx + g.x_offset_, -g.y_offset_) ;
+        gx +=  g.x_advance_;
+    }
+
+    cursor_x_ += gx + dx ;
+    cursor_y_ += dy ;
+
+    canvas_.save() ;
+    canvas_.setTransform(Matrix2d::translation(x + dx, y + dy)) ;
+    canvas_.setFont(f) ;
+    setPaint(e) ;
+
+    canvas_.drawGlyphs(line.glyphs(), gpos) ;
+
+    canvas_.restore() ;
+
+    popState() ;
+}
+
+void RenderingContext::render(TRefElement &e)
+{
+    Element *eref = e.root().resolve(e.href_) ;
+
+    pushState(e.style_) ;
+
+    canvas_.save() ;
+
+    if ( auto p = dynamic_cast<TSpanElement *>(eref) ) {
+        render(*p) ;
+    } else if ( auto p = dynamic_cast<TextElement *>(eref)  ) {
+        for( auto &c: p->children() ) {
+            if ( auto q = dynamic_cast<TSpanElement *>(c.get()))
+                render(*q) ;
+            else if ( auto q = dynamic_cast<TRefElement *>(c.get()))
+                render(*q) ;
+        }
+    }
+
+    canvas_.restore() ;
+
+    popState() ;
 
 }
 
-void RenderingContext::render(TextSpanElement &)
-{
-
-}
 
 void RenderingContext::render(Element *e) {
     if ( auto p = dynamic_cast<SVGElement *>(e) ) render(*p) ;
@@ -684,7 +836,7 @@ void RenderingContext::render(Element *e) {
     else if ( auto p = dynamic_cast<UseElement *>(e) ) render(*p) ;
     else if ( auto p = dynamic_cast<ImageElement *>(e) ) render(*p) ;
     else if ( auto p = dynamic_cast<TextElement *>(e) ) render(*p) ;
-    else if ( auto p = dynamic_cast<TextSpanElement *>(e) ) render(*p) ;
+
 }
 
 void RenderingContext::clip(Element *e) {

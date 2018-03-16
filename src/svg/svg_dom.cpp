@@ -53,6 +53,13 @@ void Element::parseElementAttributes(const Dictionary &attrs) {
         root().registerNamedElement(v, this) ;
     }) ;
 
+    attrs.visit("xml::space", [&](const string &v) {
+        if ( v == "preserve" )
+            ws_ = WhiteSpaceProcessing::Preserve ;
+        else
+            ws_ = WhiteSpaceProcessing::Default ;
+    }) ;
+
 }
 
 void Element::parseViewBoxAttributes(const Dictionary &attrs, ViewBox &vb, PreserveAspectRatio &par) {
@@ -825,27 +832,39 @@ void SymbolElement::parseAttributes(const Dictionary &attrs) {
     parseAttribute("y", attrs, y_) ;
 }
 
+// we do not handle glyphs and rotation
+void Element::parseTextPosAttributes(const Dictionary &attrs, OptionalAttribute<Length> &x, OptionalAttribute<Length> &y,
+                                     OptionalAttribute<Length> &dx, OptionalAttribute<Length> &dy) {
+    parseOptionalAttribute("x", attrs, x) ;
+    parseOptionalAttribute("y", attrs, y) ;
+    parseOptionalAttribute("dx", attrs, dx) ;
+    parseOptionalAttribute("dy", attrs, dy) ;
+}
 
 void TextElement::parseAttributes(const Dictionary &attrs)
 {
     parseElementAttributes(attrs) ;
     parseStyleAttributes(attrs, style_) ;
     parseTransformAttribute(attrs, trans_) ;
-
-    for( const auto &lp: attrs ) {
-        string key = lp.first, val = lp.second ;
-
-        if ( key == "x" )
-            x_ = Length::parseList(val) ;
-        else if ( key == "y" )
-            y_ = Length::parseList(val) ;
-        else if ( key == "dx" )
-            dx_ = Length::parseList(val) ;
-        else if ( key == "dy" )
-            dy_ = Length::parseList(val) ;
-    }
-
+    parseTextPosAttributes(attrs, x_, y_, dx_, dy_) ;
 }
+
+void TSpanElement::parseAttributes(const Dictionary &attrs)
+{
+    parseElementAttributes(attrs) ;
+    parseStyleAttributes(attrs, style_) ;
+    parseTextPosAttributes(attrs, x_, y_, dx_, dy_) ;
+}
+
+void TRefElement::parseAttributes(const Dictionary &attrs)
+{
+    parseElementAttributes(attrs) ;
+    parseStyleAttributes(attrs, style_) ;
+    parseTextPosAttributes(attrs, x_, y_, dx_, dy_) ;
+
+    href_ = attrs.get("xlink:href") ;
+}
+
 
 }
 }

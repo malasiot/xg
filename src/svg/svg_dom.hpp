@@ -109,6 +109,29 @@ public:
     std::string href_ ;
 } ;
 
+
+template<typename S>
+class OptionalAttribute {
+public:
+
+    typedef S type ;
+
+    // set default value
+    OptionalAttribute(const S &def): default_(def) {}
+
+    OptionalAttribute(const OptionalAttribute<S> &) = delete ;
+    OptionalAttribute &operator = ( const OptionalAttribute<S> &) = delete ;
+
+    S value() const { return ( has_value_ ) ? value_ : default_ ; }
+    void assign(const S &val) { value_ = val ; has_value_ = true ; }
+    bool hasValue() const { return has_value_ ;}
+    void setDefault(const S &val) { default_ = val; }
+
+    S value_ ;
+    S default_ ;
+    bool has_value_ = false ;
+} ;
+
 class CircleElement ;
 class LineElement ;
 class PolylineElement ;
@@ -127,6 +150,8 @@ class LinearGradientElement ;
 class RadialGradientElement ;
 class PatternElement ;
 class TextSpanElement ;
+class TSpanElement ;
+class TRefElement ;
 class SVGElement ;
 class StyleElement ;
 class Element ;
@@ -134,6 +159,8 @@ class Element ;
 // base class of all SVG elements
 
 using ElementPtr = std::shared_ptr<Element> ;
+
+enum class WhiteSpaceProcessing { Default, Preserve } ;
 
 class Element
 {
@@ -146,6 +173,8 @@ public:
     void parseStyleAttributes(const Dictionary &p, Style &style) ;
     void parseTransformAttribute(const Dictionary &p, Matrix2d &t) ;
     void parseViewBoxAttributes(const Dictionary &p, ViewBox &view_box, PreserveAspectRatio &preserve_aspect_ratio );
+    void parseTextPosAttributes(const Dictionary &attrs, OptionalAttribute<Length> &x, OptionalAttribute<Length> &y,
+                                OptionalAttribute<Length> &dx, OptionalAttribute<Length> &dy);
 
     virtual bool canHaveChild(const ElementPtr &p) const { return false ; }
 
@@ -163,13 +192,17 @@ public:
 
     std::string id() const ;
 
+    WhiteSpaceProcessing space() const { return ws_ ; }
+
     const std::vector<ElementPtr> &children() const { return children_ ; }
+
 
 protected:
 
     std::string id_ ;
     Element *parent_ = nullptr ;
     SVGElement *root_ ;
+    WhiteSpaceProcessing ws_ = WhiteSpaceProcessing::Default ;
 
     std::vector<ElementPtr> children_ ;
 } ;
@@ -201,27 +234,6 @@ ClipPathElement, ImageElement, PatternElement, StyleElement, TextElement> ;
 
 using ShapeContainer = Container<CircleElement, LineElement, PolylineElement, PolygonElement, RectElement, PathElement, EllipseElement, UseElement, TextElement> ;
 
-template<typename S>
-class OptionalAttribute {
-public:
-
-    typedef S type ;
-
-    // set default value
-    OptionalAttribute(const S &def): default_(def) {}
-
-    OptionalAttribute(const OptionalAttribute<S> &) = delete ;
-    OptionalAttribute &operator = ( const OptionalAttribute<S> &) = delete ;
-
-    S value() const { return ( has_value_ ) ? value_ : default_ ; }
-    void assign(const S &val) { value_ = val ; has_value_ = true ; }
-    bool hasValue() const { return has_value_ ;}
-    void setDefault(const S &val) { default_ = val; }
-
-    S value_ ;
-    S default_ ;
-    bool has_value_ = false ;
-} ;
 
 
 
@@ -474,38 +486,43 @@ public:
     PointList points_ ;
 } ;
 
-class TextPosElement
-{
-public:
-
-    TextPosElement() = default ;
-
-    void parseAttributes(const Dictionary &pNode) ;
-
-    Length x_{0}, y_{0}, dx_{0}, dy_{0} ;
-    bool preserve_white_{false} ;
-} ;
-
 enum class LengthAdjust { Spacing, GlyphsAndSpacing } ;
 
-class TextElement: public Container<TextElement, TextSpanElement>, public Stylable, public Transformable {
+class TextPosElement {
+public:
+    OptionalAttribute<Length> x_{0}, y_{0}, dx_{0}, dy_{0} ;
+} ;
+
+class TextContentElement {
+    OptionalAttribute<Length> text_length_{0} ;
+    LengthAdjust adjust_ = LengthAdjust::Spacing ;
+} ;
+
+class TextElement: public Container<TextElement, TSpanElement, TRefElement>,
+        public TextPosElement, public TextContentElement, public Stylable, public Transformable {
 public:
 
     TextElement() {}
 
     void parseAttributes(const Dictionary &a) ;
+} ;
 
-    std::vector<Length> x_, y_, dx_, dy_ ;
-    std::vector<double> rotate_ ;
-    OptionalAttribute<Length> text_length_{0} ;
-    LengthAdjust adjust_ = LengthAdjust::Spacing ;
+class TRefElement: public Element, public TextPosElement, public Stylable {
+public:
+
+    TRefElement() = default ;
+
+    void parseAttributes(const Dictionary &a) ;
+
+    std::string href_ ;
 } ;
 
 
-class TextSpanElement: public TextPosElement, public Container<TextSpanElement> {
+class TSpanElement:  public Container<TSpanElement, TRefElement>, public TextPosElement, public TextContentElement, public Stylable {
 public:
 
-    TextSpanElement() = default ;
+    TSpanElement() = default ;
+    TSpanElement(const std::string &text): text_(text) {}
 
     void parseAttributes(const Dictionary &a) ;
 

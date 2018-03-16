@@ -118,6 +118,13 @@ class Style
 
     OverflowType getOverflow() const { return findAttribute<OverflowType>(StyleAttributeType::Overflow, OverflowType::Visible) ; }
 
+    std::string getFontFamily() const { return findAttribute<std::string>(StyleAttributeType::FontFamily, "serif") ; }
+    FontStyle getFontStyle() const { return findAttribute<FontStyle>(StyleAttributeType::FontStyle, FontStyle::Normal ) ; }
+    FontWeight getFontWeight() const { return findAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::Normal ) ; }
+    FontSize getFontSize() const { return findAttribute<FontSize>(StyleAttributeType::FontSize, 12.0_px ) ; }
+    FontVariant getFontVariant() const { return findAttribute<FontVariant>(StyleAttributeType::FontVariant, FontVariant::Normal ) ; }
+
+
     void parseNameValue(const std::string &name, const std::string &val, Element *) ;
     void fromStyleString(const std::string &str, Element *) ;
 
@@ -142,7 +149,8 @@ class Style
 
     void extend(const Style &other) {
         for( const auto &lp: other.attributes_ ) {
-            attributes_.insert({lp.first, lp.second}) ;
+        //    attributes_.insert({lp.first, lp.second}) ;
+            attributes_[lp.first] = lp.second ;
         }
     }
 

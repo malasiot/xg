@@ -15,6 +15,8 @@ public:
 
       RenderingContext(Canvas &canvas, RenderingMode m = RenderingMode::Display): canvas_(canvas), rendering_mode_(m) {
           view_boxes_.push_back({0, 0, (float)canvas.width(), (float)canvas.height()}) ;
+          dpi_x_ = canvas_.dpiX() ;
+          dpi_y_ = canvas_.dpiY() ;
       }
 
       void pushState(const Style &) ;
@@ -47,15 +49,14 @@ public:
       void render(PathElement &) ;
       void render(RectElement &) ;
       void render(EllipseElement &) ;
-      //void visit(DefsElement &) override ;
       void render(GroupElement &) ;
       void render(SymbolElement &, double pw, double ph) ;
       void render(UseElement &) ;
-     // void visit(ClipPathElement &) override ;
       void render(ImageElement &) ;
       void render(TextElement &) ;
-      void render(TextSpanElement &) ;
-      //void visit(StyleElement &) override ;
+      void render(TSpanElement &) ;
+      void render(TRefElement &) ;
+
 
       void render(Element *e) ;
       void renderChildren(const Element &e) ;
@@ -70,8 +71,7 @@ public:
       void setLinearGradientBrush(LinearGradientElement &e, float a) ;
       void setRadialGradientBrush(RadialGradientElement &e, float a) ;
       void setPatternBrush(PatternElement &e, float a) ;
-
-
+      Font makeFont(const Style &st);
 
 protected:
 
@@ -85,11 +85,12 @@ protected:
       std::map<std::string, ElementPtr> refs_ ;
       Matrix2d view2dev_ ;
 
-      double ctx, cty ;
+      double cursor_x_, cursor_y_ ;
       std::string file_path_ ;
       float doc_width_hint_, doc_height_hint_ ;
       float dpi_x_ = 92, dpi_y_ = 92 ;
       Path clip_path_ ;
+
 
 };
 
