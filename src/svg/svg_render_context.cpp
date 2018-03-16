@@ -6,6 +6,54 @@ using namespace std ;
 namespace xg {
 namespace svg {
 
+/* Recursive evaluation of all parent elements regarding absolute font size */
+
+#if 0
+static double RenderingContext::normalizeFontSize (Element *e)
+{
+    Element *parent;
+
+    switch ( state->font_size.unit) {
+    case LENGTH_UNIT_PERCENT:
+    case LENGTH_UNIT_FONT_EM:
+    case LENGTH_UNIT_FONT_EX: {
+        double parent_size;
+
+        parent = rsvg_state_parent (state);
+        if (parent) {
+            parent_size = normalize_font_size (parent, ctx);
+        } else {
+            parent_size = 12.0;
+        }
+        return state->font_size.length * parent_size;
+    }
+
+    case LENGTH_UNIT_RELATIVE_LARGER:
+    case LENGTH_UNIT_RELATIVE_SMALLER: {
+        double parent_size;
+
+        parent = rsvg_state_parent (state);
+        if (parent) {
+            parent_size = normalize_font_size (parent, ctx);
+        } else {
+            parent_size = 12.0;
+        }
+
+        if (state->font_size.unit == LENGTH_UNIT_RELATIVE_LARGER) {
+            return parent_size * 1.2;
+        } else {
+            return parent_size / 1.2;
+        }
+    }
+
+    default:
+        return rsvg_length_normalize (&state->font_size, ctx);
+    }
+}
+
+#endif
+
+
 float RenderingContext::toPixels(const Length &l, LengthDirection dir, bool scale_to_viewport) {
     double factor = 1.0 ;
 
@@ -40,9 +88,9 @@ float RenderingContext::toPixels(const Length &l, LengthDirection dir, bool scal
         else if ( dir == LengthDirection::Vertical ) return  l.value() * factor * dpi_y_ ;
         else if ( dir == LengthDirection::Absolute ) return  l.value() * factor*sqrt(dpi_x_ * dpi_y_) ;
     case LengthUnitType::EMS:
-        return l.value() * default_font_size ;
+        return l.value() * font_sizes_.back() ;
     case LengthUnitType::EXS:
-        return l.value() * default_font_size * 0.5;
+        return l.value() * font_sizes_.back() * 0.5;
     case LengthUnitType::Percentage: {
         float fx = ( scale_to_viewport ) ? view_boxes_.back().width_ : obbox_.width() ;
         float fy = ( scale_to_viewport ) ? view_boxes_.back().height_ : obbox_.height() ;
@@ -655,7 +703,6 @@ void RenderingContext::render(ImageElement &e) {
      canvas_.drawImage(im, opc) ;
      canvas_.restore() ;
 
-
      canvas_.restore() ;
 
      popTransform() ;
@@ -669,9 +716,48 @@ Font RenderingContext::makeFont(const Style &st)
     FontStyle f_style = st.getFontStyle() ;
     FontVariant f_variant = st.getFontVariant() ;
     FontWeight f_weight = st.getFontWeight() ;
-    double f_size = toPixels(st.getFontSize().val_, LengthDirection::Vertical) ;
 
-    Font f(f_family, f_size) ;
+    FontSize f_size = st.getFontSize() ;
+    double f_size_px, f_size_parent = font_sizes_.back(), f_size_prefered = 12 ;
+
+    switch ( f_size.type_ ) {
+    case FontSizeType::Larger:
+        f_size_px = f_size_parent * 1.2 ;
+        break ;
+    case FontSizeType::Smaller:
+        f_size_px = f_size_parent / 1.2 ;
+        break ;
+    case FontSizeType::Medium:
+        f_size_px = f_size_prefered  ;
+        break ;
+    case FontSizeType::Large:
+        f_size_px = f_size_prefered * 1.2  ;
+        break ;
+    case FontSizeType::XLarge:
+        f_size_px = f_size_prefered * 1.5 ;
+        break ;
+    case FontSizeType::XXLarge:
+        f_size_px = f_size_prefered * 2 ;
+        break ;
+    case FontSizeType::Small:
+        f_size_px = f_size_prefered / 1.2 ;
+        break ;
+    case FontSizeType::XSmall:
+        f_size_px = f_size_prefered / 1.5 ;
+        break ;
+    case FontSizeType::XXSmall:
+        f_size_px = f_size_prefered  / 2 ;
+        break ;
+    case FontSizeType::Length:
+        if ( f_size.val_.units() == LengthUnitType::Percentage )
+            f_size_px = f_size.val_.value() * f_size_parent ;
+        else
+            f_size_px = toPixels(f_size.val_, LengthDirection::Vertical) ;
+        break ;
+    }
+
+
+    Font f(f_family, f_size_px) ;
 
     switch ( f_style )
     {
@@ -760,6 +846,8 @@ void RenderingContext::render(TSpanElement &e)
 
     Font f = makeFont(st) ;
 
+    font_sizes_.push_back(f.size()) ;
+
     // we add a space here ?
 
     TextLayout tl(e.text_ + ' ', f) ;
@@ -774,7 +862,6 @@ void RenderingContext::render(TSpanElement &e)
 
     const auto &line = tl.lines()[0] ;
 
-
     vector<Point2d> gpos ;
 
     double gx = 0 ;
@@ -783,18 +870,29 @@ void RenderingContext::render(TSpanElement &e)
         gx +=  g.x_advance_;
     }
 
+    obbox_ = Rectangle2d(x + dx, y + dy, line.width(), line.height()) ;
+
     cursor_x_ += gx + dx ;
     cursor_y_ += dy ;
 
-    canvas_.save() ;
-    canvas_.setTransform(Matrix2d::translation(x + dx, y + dy)) ;
-    canvas_.setFont(f) ;
-    setPaint(e) ;
+    if ( rendering_mode_ == RenderingMode::Display ) {
+        canvas_.save() ;
+        canvas_.setTransform(Matrix2d::translation(x + dx, y + dy)) ;
+        canvas_.setFont(f) ;
 
-    canvas_.drawGlyphs(line.glyphs(), gpos) ;
+        setPaint(e) ;
+        canvas_.drawGlyphs(line.glyphs(), gpos) ;
+        canvas_.restore() ;
 
-    canvas_.restore() ;
+        clip(e, st) ;
+    }
+    else {
+        pushTransform(Matrix2d::translation(x + dx, y + dy)) ;
+        addClipPath(Path().addGlyphs(line.glyphs(), gpos, f)) ;
+        popTransform() ;
+    }
 
+    font_sizes_.pop_back() ;
     popState() ;
 }
 

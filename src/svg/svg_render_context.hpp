@@ -17,6 +17,7 @@ public:
           view_boxes_.push_back({0, 0, (float)canvas.width(), (float)canvas.height()}) ;
           dpi_x_ = canvas_.dpiX() ;
           dpi_y_ = canvas_.dpiY() ;
+          font_sizes_.push_back(12) ;
       }
 
       void pushState(const Style &) ;
@@ -79,6 +80,7 @@ protected:
       std::deque<Style> states_ ;
       std::deque<Matrix2d> transforms_ ;
       std::deque<ViewBox> view_boxes_ ;
+      std::deque<double> font_sizes_ ;
 
       Rectangle2d obbox_  ;
       RenderingMode rendering_mode_ ;
