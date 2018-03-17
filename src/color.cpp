@@ -1,5 +1,6 @@
 #include <xg/color.hpp>
 #include <regex>
+#include <cmath>
 
 using namespace std ;
 

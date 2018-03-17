@@ -12,7 +12,7 @@ void drawShape(Canvas &canvas, const Rectangle2d &rect) {
     canvas.drawLine(rect.bottomLeft(), rect.topRight()) ;
 
     Path p ;
-    p.addText("Hello", rect.x(), rect.y(), Font("Arial", 12)) ;
+    p.addText("Hello", rect.x(), rect.y(), Font("Arial,serif", 12)) ;
     canvas.drawPath(p) ;
 }
 
