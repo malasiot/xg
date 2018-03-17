@@ -20,7 +20,7 @@ public:
     ViewBox() = default ;
     ViewBox(float x, float y, float w, float h): x_(x), y_(y), width_(w), height_(h) {}
 
-    void parse(const std::string &s) ;
+    bool parse(const std::string &s) ;
 
     float x_ = 0, y_ = 0, width_ = 0 , height_ = 0 ;
 } ;
@@ -29,9 +29,13 @@ class PathData
 {
 public:
 
-    PathData() {}
+    PathData() = default ;
 
-    void parse(const std::string &str) ;
+    bool parse(const std::string &str) ;
+
+    const Path &path() const { return path_ ; }
+
+protected:
 
     Path path_ ;
 } ;
@@ -40,7 +44,11 @@ public:
 class PointList {
 public:
 
-    void parse(const std::string &str) ;
+    bool parse(const std::string &str) ;
+
+    const std::vector<Point2d> &points() const { return points_ ; }
+
+protected:
 
     std::vector<Point2d> points_ ;
 } ;
@@ -66,49 +74,29 @@ public:
 
     PreserveAspectRatio(): view_box_align_(XMidYMid), view_box_policy_(MeetViewBoxPolicy), defer_aspect_ratio_(false) {}
 
-    void parse(const std::string &str) ;
-    void constrainViewBox(double width, double height, ViewBox &orig) ;
-    Matrix2d getViewBoxTransform(double sw, double sh, double vwidth, double vheight, double vx, double vy);
+    bool parse(const std::string &str) ;
+    void constrainViewBox(double width, double height, ViewBox &orig) const;
+    Matrix2d getViewBoxTransform(double sw, double sh, double vwidth, double vheight, double vx, double vy) const;
 
     bool defer_aspect_ratio_ ;
     ViewBoxAlign view_box_align_ ;
     ViewBoxPolicy view_box_policy_ ;
 } ;
 
-class Stylable {
+class URIReference {
 public:
+    URIReference() = default ;
+    URIReference(const std::string &val): uri_(val) {}
 
-    virtual ~Stylable() {}
-    Style style_ ;
-} ;
-
-class Transformable
-{
-public:
-
-    virtual ~Transformable() {}
-
-    Matrix2d trans_ ;
-} ;
-
-class FitToViewBox {
-public:
-
-    ViewBox view_box_ ;
-    PreserveAspectRatio preserve_aspect_ratio_ ;
-} ;
-
-
-class URI {
-public:
-
-    void parse(const std::string &val) {
-        href_ = val ; // not parsed
+    bool parse(const std::string &v) {
+        uri_ = v ;
+        return true ;
     }
 
-    std::string href_ ;
-} ;
+    const std::string &uri() const { return uri_ ; }
 
+    std::string uri_ ;
+};
 
 template<typename S>
 class OptionalAttribute {
@@ -117,20 +105,48 @@ public:
     typedef S type ;
 
     // set default value
-    OptionalAttribute(const S &def): default_(def) {}
+    OptionalAttribute() = default ;
 
     OptionalAttribute(const OptionalAttribute<S> &) = delete ;
     OptionalAttribute &operator = ( const OptionalAttribute<S> &) = delete ;
 
-    S value() const { return ( has_value_ ) ? value_ : default_ ; }
+    const S &value() const { return value_ ; }
     void assign(const S &val) { value_ = val ; has_value_ = true ; }
     bool hasValue() const { return has_value_ ;}
-    void setDefault(const S &val) { default_ = val; }
 
     S value_ ;
-    S default_ ;
     bool has_value_ = false ;
 } ;
+
+#define SVG_ELEMENT_ATTRIBUTE(avar, aget, atype, adef)\
+protected:\
+    OptionalAttribute<atype> avar ;\
+public:\
+\
+    const atype &aget() const { \
+        static const atype avar_default_{adef} ;\
+        return ( avar.hasValue() ) ? avar.value() : avar_default_ ; }\
+    bool aget##IsSet() const { return avar.hasValue() ; }
+
+
+class Stylable {
+public:
+
+    SVG_ELEMENT_ATTRIBUTE(style_, style, Style, Style())
+} ;
+
+class Transformable {
+public:
+    SVG_ELEMENT_ATTRIBUTE(trans_, trans, Matrix2d, Matrix2d())
+} ;
+
+class FitToViewBox {
+public:
+
+    SVG_ELEMENT_ATTRIBUTE(view_box_, viewBox, ViewBox, ViewBox())
+    SVG_ELEMENT_ATTRIBUTE(preserve_aspect_ratio_, preserveAspectRatio, PreserveAspectRatio, PreserveAspectRatio())
+} ;
+
 
 class CircleElement ;
 class LineElement ;
@@ -170,9 +186,10 @@ public:
     virtual ~Element() = default ;
 
     void parseElementAttributes(const Dictionary &a) ;
-    void parseStyleAttributes(const Dictionary &p, Style &style) ;
-    void parseTransformAttribute(const Dictionary &p, Matrix2d &t) ;
-    void parseViewBoxAttributes(const Dictionary &p, ViewBox &view_box, PreserveAspectRatio &preserve_aspect_ratio );
+    void parseStyleAttributes(const Dictionary &p, OptionalAttribute<Style> &style) ;
+    void parseTransformAttribute(const Dictionary &p, OptionalAttribute<Matrix2d> &t) ;
+    void parseViewBoxAttributes(const Dictionary &p, OptionalAttribute<ViewBox> &view_box,
+                                OptionalAttribute<PreserveAspectRatio> &preserve_aspect_ratio );
     void parseTextPosAttributes(const Dictionary &attrs, OptionalAttribute<Length> &x, OptionalAttribute<Length> &y,
                                 OptionalAttribute<Length> &dx, OptionalAttribute<Length> &dy);
 
@@ -185,10 +202,10 @@ public:
         return true ;
     }
 
-    void setRoot(SVGElement *e) { root_ = e ; }
+    void setDocument(SVGDocument *doc) { root_ = doc ; }
 
     // return most close SVGElement
-    SVGElement &root() { return *root_;}
+    SVGDocument &document() { return *root_;}
 
     std::string id() const ;
 
@@ -201,7 +218,7 @@ protected:
 
     std::string id_ ;
     Element *parent_ = nullptr ;
-    SVGElement *root_ ;
+    SVGDocument *root_ ;
     WhiteSpaceProcessing ws_ = WhiteSpaceProcessing::Default ;
 
     std::vector<ElementPtr> children_ ;
@@ -209,7 +226,7 @@ protected:
 
 
 
-// Helper class to define container elements that can contain children belonginf only within a set of types
+// Helper class to define container elements that can contain children belonging only within a set of types
 
 template<typename...>
 struct Container: public Element {
@@ -234,9 +251,6 @@ ClipPathElement, ImageElement, PatternElement, StyleElement, TextElement> ;
 
 using ShapeContainer = Container<CircleElement, LineElement, PolylineElement, PolygonElement, RectElement, PathElement, EllipseElement, UseElement, TextElement> ;
 
-
-
-
 class StyleElement: public Element {
 public:
 
@@ -244,7 +258,9 @@ public:
 
     void parseAttributes(const Dictionary &) ;
 
-    std::string type_, media_, title_ ;
+    SVG_ELEMENT_ATTRIBUTE(type_, type, std::string, std::string())
+    SVG_ELEMENT_ATTRIBUTE(media_, media, std::string, std::string())
+    SVG_ELEMENT_ATTRIBUTE(title_, title, std::string, std::string())
 } ;
 
 
@@ -255,7 +271,8 @@ public:
 
     void parseAttributes(const Dictionary &p) ;
 
-    OptionalAttribute<float> offset_{0.0} ;
+    SVG_ELEMENT_ATTRIBUTE(offset_, offset, float, 1.0)
+
 } ;
 
 
@@ -266,23 +283,20 @@ enum class GradientUnits { UserSpaceOnUse, ObjectBoundingBox } ;
 class GradientElement: public Container<StopElement>, public Stylable {
 public:
 
-    GradientElement(): spread_method_(GradientSpreadMethod::Pad), gradient_units_(GradientUnits::ObjectBoundingBox), trans_(Matrix2d()) { }
+    GradientElement() = default ;
 
     void parseAttributes(const Dictionary &pNode) ;
 
-    GradientSpreadMethod spreadMethod() ;
-    GradientUnits gradientUnits() ;
-    Matrix2d gradientTransform() ;
+    GradientSpreadMethod spreadMethodInherited() ;
+    GradientUnits gradientUnitsInherited() ;
+    Matrix2d gradientTransformInherited() ;
 
     void collectStops(std::vector<StopElement *> &stops) ;
-protected:
 
-
-    OptionalAttribute<GradientSpreadMethod> spread_method_ ;
-    OptionalAttribute<GradientUnits> gradient_units_ ;
-    OptionalAttribute<Matrix2d> trans_ ;
-    std::string href_ ;
-
+    SVG_ELEMENT_ATTRIBUTE(spread_method_, spreadMethod, GradientSpreadMethod, GradientSpreadMethod::Pad)
+    SVG_ELEMENT_ATTRIBUTE(gradient_units_, gradientUnits, GradientUnits, GradientUnits::ObjectBoundingBox)
+    SVG_ELEMENT_ATTRIBUTE(trans_, gradientTransform, Matrix2d, Matrix2d())
+    SVG_ELEMENT_ATTRIBUTE(href_, href, URIReference, URIReference{})
 } ;
 
 class LinearGradientElement: public GradientElement {
@@ -292,12 +306,16 @@ public:
 
     void parseAttributes(const Dictionary &a) ;
 
-    Length x1() ;
-    Length y1() ;
-    Length x2() ;
-    Length y2() ;
+    Length x1_inherited() ;
+    Length y1_inherited() ;
+    Length x2_inherited() ;
+    Length y2_inherited() ;
 
-    OptionalAttribute<Length> x1_{0.0_perc}, y1_{0.0_perc}, x2_{1.0_perc}, y2_{0.0_perc} ;
+    SVG_ELEMENT_ATTRIBUTE(x1_, x1, Length, 0.0_perc)
+    SVG_ELEMENT_ATTRIBUTE(y1_, y1, Length, 0.0_perc)
+    SVG_ELEMENT_ATTRIBUTE(x2_, x2, Length, 1.0_perc)
+    SVG_ELEMENT_ATTRIBUTE(y2_, y2, Length, 0.0_perc)
+
 } ;
 
 class RadialGradientElement: public GradientElement {
@@ -307,13 +325,18 @@ public:
 
     void parseAttributes(const Dictionary &a) ;
 
-    Length cx() ;
-    Length cy() ;
-    Length fx() ;
-    Length fy() ;
-    Length r() ;
+    Length cx_inherited() ;
+    Length cy_inherited() ;
+    Length fx_inherited() ;
+    Length fy_inherited() ;
+    Length r_inherited() ;
 
-    OptionalAttribute<Length> cx_{0.5_perc}, cy_{0.5_perc}, r_{0.5_perc}, fx_{0}, fy_{0} ;
+    SVG_ELEMENT_ATTRIBUTE(cx_, cx, Length, 0.5_perc)
+    SVG_ELEMENT_ATTRIBUTE(cy_, cy, Length, 0.5_perc)
+    SVG_ELEMENT_ATTRIBUTE(fx_, fx, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(fy_, fy, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(r_, r, Length, 0.5_perc)
+
 } ;
 
 enum class PatternUnits { UserSpaceOnUse, ObjectBoundingBox } ;
@@ -329,30 +352,31 @@ public:
 
     void parseAttributes(const Dictionary &a) ;
 
-    PatternUnits patternUnits() ;
-    PatternUnits patternContentUnits() ;
-    Matrix2d patternTransform() ;
-    Length x() ;
-    Length y() ;
-    Length width() ;
-    Length height() ;
-    ViewBox viewBox() ;
-    PreserveAspectRatio preserveAspectRatio() ;
+    PatternUnits patternUnitsInherited() ;
+    PatternUnits patternContentUnitsInherited() ;
+    Matrix2d patternTransformInherited() ;
+    Length xInherited() ;
+    Length yInherited() ;
+    Length widthInherited() ;
+    Length heightInherited() ;
+    ViewBox viewBoxInherited() ;
+    PreserveAspectRatio preserveAspectRatioInherited() ;
 
-    bool hasViewBox() const { return view_box_.hasValue() ; }
 
     void collectChildren(std::vector<Element *> &children);
 
-protected:
+    SVG_ELEMENT_ATTRIBUTE(pattern_units_, patternUnits, PatternUnits, PatternUnits::ObjectBoundingBox)
+    SVG_ELEMENT_ATTRIBUTE(pattern_content_units_, patternContentUnits, PatternUnits, PatternUnits::UserSpaceOnUse)
+    SVG_ELEMENT_ATTRIBUTE(trans_, patternTransform, Matrix2d, Matrix2d())
 
-    OptionalAttribute<PatternUnits> pattern_units_{PatternUnits::ObjectBoundingBox} ;
-    OptionalAttribute<PatternUnits> pattern_content_units_{PatternUnits::UserSpaceOnUse} ;
-    OptionalAttribute<Matrix2d> trans_{Matrix2d()} ;
-    OptionalAttribute<Length> x_{0}, y_{0}, width_{0}, height_{0} ;
-    OptionalAttribute<ViewBox> view_box_{ViewBox()} ;
-    OptionalAttribute<PreserveAspectRatio> preserve_aspect_ratio_{PreserveAspectRatio()} ;
+    SVG_ELEMENT_ATTRIBUTE(x_, x, Length, 0.0)
+    SVG_ELEMENT_ATTRIBUTE(y_, y, Length, 0.0)
+    SVG_ELEMENT_ATTRIBUTE(width_, width, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(height_, height, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(view_box_, viewBox, ViewBox, ViewBox())
+    SVG_ELEMENT_ATTRIBUTE(preserve_aspect_ratio_, preserveAspectRatio, PreserveAspectRatio, PreserveAspectRatio())
 
-    std::string href_ ;
+    SVG_ELEMENT_ATTRIBUTE(href_, href, URIReference, URIReference{})
 } ;
 
 
@@ -364,9 +388,13 @@ public:
 
     void parseAttributes(const Dictionary &attrs) ;
 
-    std::string uri_ ;
-    Length x_{0}, y_{0}, width_{0}, height_{0} ;
-    PreserveAspectRatio preserve_aspect_ratio_ ;
+    SVG_ELEMENT_ATTRIBUTE(uri_, uri, std::string, std::string())
+    SVG_ELEMENT_ATTRIBUTE(x_, x, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(y_, y, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(width_, width, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(height_, height, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(preserve_aspect_ratio_, preserveAspectRatio, PreserveAspectRatio, PreserveAspectRatio{})
+
 } ;
 
 enum ClipPathUnits { UserSpaceOnUse, ObjectBoundingBox } ;
@@ -377,11 +405,11 @@ class ClipPathElement:
 {
 public:
 
-    ClipPathElement(): clip_path_units_(UserSpaceOnUse) {}
+    ClipPathElement() = default ;
 
     void parseAttributes(const Dictionary &a) ;
 
-    ClipPathUnits clip_path_units_ ;
+    SVG_ELEMENT_ATTRIBUTE(clip_path_units_, clipPathUnits, ClipPathUnits, ClipPathUnits::UserSpaceOnUse)
 
 } ;
 
@@ -392,8 +420,12 @@ public:
 
     void parseAttributes(const Dictionary &a)  ;
 
-    Length x_{0}, y_{0}, width_, height_ ;
-    std::string href_ ;
+    SVG_ELEMENT_ATTRIBUTE(href_, href, URIReference, URIReference{})
+    SVG_ELEMENT_ATTRIBUTE(x_, x, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(y_, y, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(width_, width, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(height_, height, Length, 0)
+
 } ;
 
 
@@ -423,27 +455,34 @@ public:
 
     void parseAttributes(const Dictionary &a)  ;
 
-    PathData path_ ;
+    SVG_ELEMENT_ATTRIBUTE(data_, data, PathData, PathData())
 } ;
 
 class RectElement: public Element, public Stylable, public Transformable {
 public:
 
-    RectElement() {}
+    RectElement() = default ;
 
     void parseAttributes(const Dictionary &a)  ;
 
-    Length x_, y_, width_, height_, rx_, ry_ ;
+    SVG_ELEMENT_ATTRIBUTE(x_, x, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(y_, y, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(width_, width, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(height_, height, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(rx_, rx, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(ry_, ry, Length, 0)
 } ;
 
 class CircleElement: public Element,  public Stylable, public Transformable {
 public:
 
-    CircleElement() {}
+    CircleElement() = default ;
 
     void parseAttributes(const Dictionary &a)  ;
 
-    Length cx_, cy_, r_ ;
+    SVG_ELEMENT_ATTRIBUTE(cx_, cx, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(cy_, cy, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(r_, r, Length, 0)
 } ;
 
 class LineElement: public Element,  public Stylable, public Transformable {
@@ -453,7 +492,10 @@ public:
 
     void parseAttributes(const Dictionary &a)  ;
 
-    Length x1_, y1_, x2_, y2_ ;
+    SVG_ELEMENT_ATTRIBUTE(x1_, x1, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(y1_, y1, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(x2_, x2, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(y2_, y2, Length, 0)
 } ;
 
 class EllipseElement: public Element, public Stylable, public Transformable {
@@ -463,7 +505,10 @@ public:
 
     void parseAttributes(const Dictionary &a)  ;
 
-    Length cx_, cy_, rx_, ry_ ;
+    SVG_ELEMENT_ATTRIBUTE(cx_, cx, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(cy_, cy, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(rx_, rx, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(ry_, ry, Length, 0)
 } ;
 
 class PolylineElement: public Element, public Stylable, public Transformable {
@@ -473,7 +518,7 @@ public:
 
     void parseAttributes(const Dictionary &a)  ;
 
-    PointList points_ ;
+    SVG_ELEMENT_ATTRIBUTE(points_, points, PointList, PointList{})
 } ;
 
 class PolygonElement: public Element , public Stylable, public Transformable {
@@ -483,19 +528,24 @@ public:
 
     void parseAttributes(const Dictionary &a)  ;
 
-    PointList points_ ;
+    SVG_ELEMENT_ATTRIBUTE(points_, points, PointList, PointList{})
 } ;
 
 enum class LengthAdjust { Spacing, GlyphsAndSpacing } ;
 
 class TextPosElement {
 public:
-    OptionalAttribute<Length> x_{0}, y_{0}, dx_{0}, dy_{0} ;
+    SVG_ELEMENT_ATTRIBUTE(x_, x, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(y_, y, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(dx_, dx, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(dy_, dy, Length, 0)
 } ;
 
 class TextContentElement {
-    OptionalAttribute<Length> text_length_{0} ;
-    LengthAdjust adjust_ = LengthAdjust::Spacing ;
+public:
+
+    SVG_ELEMENT_ATTRIBUTE(text_length_, textLength, Length, 0)
+    SVG_ELEMENT_ATTRIBUTE(adjust_, lengthAdjust, LengthAdjust, LengthAdjust::Spacing)
 } ;
 
 class TextElement: public Container<TextElement, TSpanElement, TRefElement>,
@@ -514,7 +564,7 @@ public:
 
     void parseAttributes(const Dictionary &a) ;
 
-    std::string href_ ;
+    SVG_ELEMENT_ATTRIBUTE(href_, href, URIReference, URIReference{})
 } ;
 
 
@@ -529,21 +579,6 @@ public:
     std::string text_ ;
 } ;
 
-template<typename T>
-inline void parseAttribute(const char *name, const Dictionary &attr, T &t) {
-    std::string value = attr.get(name) ;
-    try {
-        if ( !value.empty() )
-            t.parse(value) ;
-    }
-    catch ( SVGDOMAttributeValueException &e ) {
-        std::string reason = e.what() ;
-        std::stringstream strm ;
-        strm << "invalid value \"" << value << "\" of attribute \"" << name << "\"" ;
-        if ( !reason.empty() ) strm << ": " << reason ;
-        throw SVGDOMException(strm.str()) ;
-    }
-}
 
 template<typename T>
 inline void parseOptionalAttribute(const char *name, const Dictionary &attr, OptionalAttribute<T> &t) {
@@ -557,7 +592,7 @@ inline void parseOptionalAttribute(const char *name, const Dictionary &attr, Opt
         }
     }
     catch ( SVGDOMAttributeValueException &e ) {
-        std::string reason = e.what() ;
+        std::string reason = e.msg_ ;
         std::stringstream strm ;
         strm << "invalid value \"" << value << "\" of attribute \"" << name << "\"" ;
         if ( !reason.empty() ) strm << ": " << reason ;
@@ -571,13 +606,9 @@ class SVGElement: public GroupContainer, public Stylable, public FitToViewBox {
 
 public:
 
-    SVGElement(): x_{0.0}, y_{0.0},
-        width_{1.0_perc}, height_{1.0_perc} {
-    }
+    SVGElement() = default ;
 
     void parseAttributes(const Dictionary &attrs) ;
-
-    void parseCSS(const std::string &str) ;
 
     void registerNamedElement(const std::string &id, Element *e) {
         elements_.insert({"#" + id, e}) ;
@@ -586,13 +617,14 @@ public:
     Element *resolve(const std::string &uri) const ;
     xg::Image loadImageResource(const std::string &uri, Element *container) ;
 
+    SVG_ELEMENT_ATTRIBUTE(x_, x, Length, 0.0)
+    SVG_ELEMENT_ATTRIBUTE(y_, y, Length, 0.0)
+    SVG_ELEMENT_ATTRIBUTE(width_, width, Length, 1.0_perc)
+    SVG_ELEMENT_ATTRIBUTE(height_, height, Length, 1.0_perc)
 
-    Length x_, y_, width_, height_ ;
+    protected:
 
-
-protected:
-
-    std::map<std::string, svg::Element *> elements_ ;
+        std::map<std::string, svg::Element *> elements_ ;
     std::map<svg::Element *, Image> cached_images_ ;
 
 } ;
@@ -605,13 +637,17 @@ public:
 
     void parseAttributes(const Dictionary &attrs) ;
 
-    Length x_{0.0}, y_{0.0}, width_{1.0_perc}, height_{1.0_perc} ;
+    SVG_ELEMENT_ATTRIBUTE(x_, x, Length, 0.0)
+    SVG_ELEMENT_ATTRIBUTE(y_, y, Length, 0.0)
+    SVG_ELEMENT_ATTRIBUTE(width_, width, Length, 1.0_perc)
+    SVG_ELEMENT_ATTRIBUTE(height_, height, Length, 1.0_perc)
+
 } ;
 
 class UnsupportedElement: public Element {
 public:
-     bool canHaveChild(const std::shared_ptr<Element> &p) const override { return true ; }
-     void parseAttributes(const Dictionary &) {}
+    bool canHaveChild(const std::shared_ptr<Element> &p) const override { return true ; }
+    void parseAttributes(const Dictionary &) {}
 };
 
 } // namespace svg

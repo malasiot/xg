@@ -3,7 +3,6 @@
 #include "svg_dom.hpp"
 
 #include <xg/util/strings.hpp>
-#include <xg/util/base64.hpp>
 
 using namespace std ;
 
@@ -16,41 +15,19 @@ void SVGElement::parseAttributes(const xg::Dictionary &attrs) {
     parseStyleAttributes(attrs, style_) ;
     parseViewBoxAttributes(attrs,  view_box_, preserve_aspect_ratio_);
 
-    parseAttribute("width", attrs, width_) ;
-    parseAttribute("height", attrs, height_) ;
+    parseOptionalAttribute("width", attrs, width_) ;
+    parseOptionalAttribute("height", attrs, height_) ;
 
-    parseAttribute("x", attrs, x_) ;
-    parseAttribute("y", attrs, y_) ;
+    parseOptionalAttribute("x", attrs, x_) ;
+    parseOptionalAttribute("y", attrs, y_) ;
 }
 
-
-Element *SVGElement::resolve(const std::string &uri) const {
-    if ( uri.empty() ) return nullptr ;
-    auto it = elements_.find(uri) ;
-    if ( it != elements_.end() ) {
-        Element *p = it->second ;
-        return p ;
-    }
-    return nullptr ;
-}
-
-Image SVGElement::loadImageResource(const string &uri, Element *container) {
-    auto it = cached_images_.find(container) ;
-    if ( it != cached_images_.end() ) return it->second ;
-
-    if ( startsWith(uri, "data:image/png;base64") ) {
-        string png_data = base64_decode(uri.substr(22)) ;
-        auto image =  Image::loadPNGBuffer(png_data) ;
-        cached_images_[container] = image ;
-        return image ;
-    }
-}
 
 void Element::parseElementAttributes(const Dictionary &attrs) {
 
     attrs.visit("id", [&](const string &v) {
         id_ = v ;
-        root().registerNamedElement(v, this) ;
+        document().registerNamedElement(v, this) ;
     }) ;
 
     attrs.visit("xml::space", [&](const string &v) {
@@ -62,16 +39,16 @@ void Element::parseElementAttributes(const Dictionary &attrs) {
 
 }
 
-void Element::parseViewBoxAttributes(const Dictionary &attrs, ViewBox &vb, PreserveAspectRatio &par) {
-    parseAttribute("viewBox", attrs, vb) ;
-    parseAttribute("preserveAspectRatio", attrs, par) ;
+void Element::parseViewBoxAttributes(const Dictionary &attrs, OptionalAttribute<ViewBox> &vb, OptionalAttribute<PreserveAspectRatio> &par) {
+    parseOptionalAttribute("viewBox", attrs, vb) ;
+    parseOptionalAttribute("preserveAspectRatio", attrs, par) ;
 }
 
-void PreserveAspectRatio::parse(const string &str) {
+bool PreserveAspectRatio::parse(const string &str) {
 
     auto tokens = split(str) ;
 
-    if ( tokens.empty() ) return ;
+    if ( tokens.empty() ) return false ;
 
     string align = tokens[0] ;
 
@@ -96,9 +73,9 @@ void PreserveAspectRatio::parse(const string &str) {
     else if ( align == "xMaxYMax" )
         view_box_align_ = XMaxYMax ;
     else
-        throw SVGDOMAttributeValueException("invalid align property") ;
+        return false ;
 
-    if ( tokens.size() < 2 ) return ;
+    if ( tokens.size() < 2 ) return true ;
 
     string policy = tokens[1] ;
 
@@ -107,11 +84,13 @@ void PreserveAspectRatio::parse(const string &str) {
     else if ( policy == "slice" )
         view_box_policy_ = SliceViewBoxPolicy ;
     else
-        throw SVGDOMAttributeValueException("invalid policy") ;
+        return false ;
+
+    return true ;
 
 }
 
-void PreserveAspectRatio::constrainViewBox(double width, double height, ViewBox &orig)
+void PreserveAspectRatio::constrainViewBox(double width, double height, ViewBox &orig) const
 {
     double origx = orig.x_ ;
     double origy = orig.y_ ;
@@ -162,7 +141,7 @@ void PreserveAspectRatio::constrainViewBox(double width, double height, ViewBox 
     orig.height_ = origh ;
 }
 
-Matrix2d PreserveAspectRatio::getViewBoxTransform(double sw, double sh, double vwidth, double vheight, double vx, double vy)
+Matrix2d PreserveAspectRatio::getViewBoxTransform(double sw, double sh, double vwidth, double vheight, double vx, double vy) const
 {
     Matrix2d trs ;
 
@@ -208,36 +187,44 @@ Matrix2d PreserveAspectRatio::getViewBoxTransform(double sw, double sh, double v
 
 }
 
-void Element::parseStyleAttributes(const Dictionary &p, Style &style) {
+void Element::parseStyleAttributes(const Dictionary &p, OptionalAttribute<Style> &style) {
+
+    Style tmp ;
+
     for( const auto &lp: p ) {
         string key = lp.first, val = lp.second ;
 
         if ( key == "style" )
-            style.fromStyleString(val, this) ;
+            tmp.fromStyleString(val) ;
         else
-            style.parseNameValue(key, val, this) ;
+            tmp.parseNameValue(key, val) ;
     }
 
+    style.assign(tmp) ;
 }
 
-void ViewBox::parse(const string &str) {
+bool ViewBox::parse(const string &str) {
     if ( !parse_coordinate_list(str, x_, y_, width_, height_) )
-        throw SVGDOMAttributeValueException() ;
+        return false ;
     if ( width_ < 0 || height_ < 0 )
-        throw SVGDOMAttributeValueException("negative dimensions not allowed") ;
+        return false ;
+    return true ;
 }
 
-void Element::parseTransformAttribute(const Dictionary &attrs, Matrix2d &t) {
+void Element::parseTransformAttribute(const Dictionary &attrs, OptionalAttribute<Matrix2d> &t) {
     attrs.visit("transform", [&](const string &v){
-        if ( !parse_transform(v, t) )
-            throw SVGDOMAttributeValueException("invalid transform");
+        Matrix2d tr ;
+        if ( !parse_transform(v, tr) )
+            throw SVGDOMAttributeValueException("transform", v);
+        else
+            t.assign(tr) ;
     }) ;
 }
 
 
-#define INHERIT_ATTRIBUTE(className, attrName, attrType)\
+#define SVG_INHERIT_ATTRIBUTE(className, attrName, attrType)\
     if ( attrName.hasValue() ) return attrName.value() ;\
-    Element *p = root().resolve(href_) ;\
+    Element *p = document().resolve(href_.value().uri()) ;\
     className *q = nullptr ;\
     \
     while (p) {\
@@ -246,7 +233,7 @@ void Element::parseTransformAttribute(const Dictionary &attrs, Matrix2d &t) {
         if ( q->attrName.hasValue() ) \
             return q->attrName.value() ;\
      \
-        p = root().resolve(q->href_) ;\
+        p = document().resolve(q->href_.value().uri()) ;\
     }\
     \
     return attrName.value() ;\
@@ -268,7 +255,7 @@ void GradientElement::parseAttributes(const Dictionary &attrs)
         else if ( key == "gradientTransform" ) {
             Matrix2d t ;
             if ( !parse_transform(val, t) )
-                throw SVGDOMAttributeValueException("invalid transform string") ;
+                throw SVGDOMAttributeValueException(key, val) ;
             trans_.assign(t) ;
         }
         else if ( key == "spreadMethod" ) {
@@ -280,22 +267,22 @@ void GradientElement::parseAttributes(const Dictionary &attrs)
                 spread_method_.assign(GradientSpreadMethod::Reflect) ;
         }
         else if ( key == "xlink:href" ) {
-            href_ = val ;
+            href_.assign(val) ;
         }
     }
 }
 
-GradientSpreadMethod GradientElement::spreadMethod() {
-    INHERIT_ATTRIBUTE(GradientElement, spread_method_, GradientSpreadMethod) ;
+GradientSpreadMethod GradientElement::spreadMethodInherited() {
+    SVG_INHERIT_ATTRIBUTE(GradientElement, spread_method_, GradientSpreadMethod) ;
 }
 
-GradientUnits GradientElement::gradientUnits() {
-    INHERIT_ATTRIBUTE(GradientElement, gradient_units_, GradientUnits) ;
+GradientUnits GradientElement::gradientUnitsInherited() {
+    SVG_INHERIT_ATTRIBUTE(GradientElement, gradient_units_, GradientUnits) ;
 }
 
 
-Matrix2d GradientElement::gradientTransform() {
-    INHERIT_ATTRIBUTE(GradientElement, trans_, Matrix2d) ;
+Matrix2d GradientElement::gradientTransformInherited() {
+    SVG_INHERIT_ATTRIBUTE(GradientElement, trans_, Matrix2d) ;
 }
 
 void GradientElement::collectStops(std::vector<StopElement *> &stops)
@@ -314,7 +301,7 @@ void GradientElement::collectStops(std::vector<StopElement *> &stops)
 
     // no stops found we need to look on referenced elements
 
-    Element *p = root().resolve(href_) ;
+    Element *p = document().resolve(href_.value().uri()) ;
     GradientElement *q = nullptr ;
 
     if (p) {
@@ -337,20 +324,20 @@ void LinearGradientElement::parseAttributes(const Dictionary &attrs)
 }
 
 
-Length LinearGradientElement::x1() {
-    INHERIT_ATTRIBUTE(LinearGradientElement,  x1_, Length)
+Length LinearGradientElement::x1_inherited() {
+    SVG_INHERIT_ATTRIBUTE(LinearGradientElement,  x1_, Length)
 }
 
-Length LinearGradientElement::y1() {
-    INHERIT_ATTRIBUTE(LinearGradientElement,  y1_, Length)
+Length LinearGradientElement::y1_inherited() {
+    SVG_INHERIT_ATTRIBUTE(LinearGradientElement,  y1_, Length)
 }
 
-Length LinearGradientElement::x2() {
-    INHERIT_ATTRIBUTE(LinearGradientElement,  x2_, Length)
+Length LinearGradientElement::x2_inherited() {
+    SVG_INHERIT_ATTRIBUTE(LinearGradientElement,  x2_, Length)
 }
 
-Length LinearGradientElement::y2() {
-    INHERIT_ATTRIBUTE(LinearGradientElement,  y2_, Length)
+Length LinearGradientElement::y2_inherited() {
+    SVG_INHERIT_ATTRIBUTE(LinearGradientElement,  y2_, Length)
 }
 
 void RadialGradientElement::parseAttributes(const Dictionary &attrs)
@@ -363,28 +350,28 @@ void RadialGradientElement::parseAttributes(const Dictionary &attrs)
     parseOptionalAttribute("fx", attrs, fx_) ;
     parseOptionalAttribute("fy", attrs, fy_) ;
 
-    if ( !fx_.hasValue() ) fx_.setDefault(cx_.value()) ;
-    if ( !fy_.hasValue() ) fy_.setDefault(cy_.value()) ;
+    if ( !fx_.hasValue() ) fx_.assign(cx()) ;
+    if ( !fy_.hasValue() ) fy_.assign(cy()) ;
 }
 
-Length RadialGradientElement::cx() {
-    INHERIT_ATTRIBUTE(RadialGradientElement,  cx_, Length)
+Length RadialGradientElement::cx_inherited() {
+    SVG_INHERIT_ATTRIBUTE(RadialGradientElement,  cx_, Length)
 }
 
-Length RadialGradientElement::cy() {
-    INHERIT_ATTRIBUTE(RadialGradientElement,  cy_, Length)
+Length RadialGradientElement::cy_inherited() {
+    SVG_INHERIT_ATTRIBUTE(RadialGradientElement,  cy_, Length)
 }
 
-Length RadialGradientElement::fx() {
-    INHERIT_ATTRIBUTE(RadialGradientElement,  fx_, Length)
+Length RadialGradientElement::fx_inherited() {
+    SVG_INHERIT_ATTRIBUTE(RadialGradientElement,  fx_, Length)
 }
 
-Length RadialGradientElement::fy() {
-    INHERIT_ATTRIBUTE(RadialGradientElement,  fy_, Length)
+Length RadialGradientElement::fy_inherited() {
+    SVG_INHERIT_ATTRIBUTE(RadialGradientElement,  fy_, Length)
 }
 
-Length RadialGradientElement::r() {
-    INHERIT_ATTRIBUTE(RadialGradientElement, r_, Length)
+Length RadialGradientElement::r_inherited() {
+    SVG_INHERIT_ATTRIBUTE(RadialGradientElement, r_, Length)
 }
 
 void PatternElement::collectChildren(std::vector<Element *> &child_list)
@@ -401,7 +388,7 @@ void PatternElement::collectChildren(std::vector<Element *> &child_list)
 
     // no child elements found we need to look on referenced elements
 
-    Element *p = root().resolve(href_) ;
+    Element *p = document().resolve(href_.value().uri()) ;
     PatternElement *q = nullptr ;
 
     if (p) {
@@ -434,7 +421,7 @@ void PatternElement::parseAttributes(const Dictionary &attrs)
         else if ( key == "patternTransform" ) {
             Matrix2d t ;
             if ( !parse_transform(val, t) )
-                throw SVGDOMAttributeValueException("invalid transform string") ;
+                throw SVGDOMAttributeValueException(key, val) ;
             trans_.assign(t) ;
         }
         else if ( key == "patternContentUnits" ) {
@@ -444,7 +431,7 @@ void PatternElement::parseAttributes(const Dictionary &attrs)
                 pattern_content_units_.assign(PatternUnits::ObjectBoundingBox) ;
         }
         else if ( val == "xlink:href" ) {
-            href_ = val ;
+            href_.assign(val) ;
         }
     }
 
@@ -454,40 +441,40 @@ void PatternElement::parseAttributes(const Dictionary &attrs)
     parseOptionalAttribute("height", attrs, height_) ;
 }
 
-PatternUnits PatternElement::patternUnits() {
-    INHERIT_ATTRIBUTE(PatternElement,  pattern_units_, PatternUnits)
+PatternUnits PatternElement::patternUnitsInherited() {
+    SVG_INHERIT_ATTRIBUTE(PatternElement,  pattern_units_, PatternUnits)
 }
 
-PatternUnits PatternElement::patternContentUnits() {
-    INHERIT_ATTRIBUTE(PatternElement,  pattern_content_units_, PatternUnits)
+PatternUnits PatternElement::patternContentUnitsInherited() {
+    SVG_INHERIT_ATTRIBUTE(PatternElement,  pattern_content_units_, PatternUnits)
 }
 
-Matrix2d PatternElement::patternTransform() {
-    INHERIT_ATTRIBUTE(PatternElement,  trans_, Matrix2d)
+Matrix2d PatternElement::patternTransformInherited() {
+    SVG_INHERIT_ATTRIBUTE(PatternElement,  trans_, Matrix2d)
 }
 
-Length PatternElement::x() {
-    INHERIT_ATTRIBUTE(PatternElement,  x_, Length)
+Length PatternElement::xInherited() {
+    SVG_INHERIT_ATTRIBUTE(PatternElement,  x_, Length)
 }
 
-Length PatternElement::y() {
-    INHERIT_ATTRIBUTE(PatternElement,  y_, Length)
+Length PatternElement::yInherited() {
+    SVG_INHERIT_ATTRIBUTE(PatternElement,  y_, Length)
 }
 
-Length PatternElement::width() {
-    INHERIT_ATTRIBUTE(PatternElement,  width_, Length)
+Length PatternElement::widthInherited() {
+    SVG_INHERIT_ATTRIBUTE(PatternElement,  width_, Length)
 }
 
-Length PatternElement::height() {
-    INHERIT_ATTRIBUTE(PatternElement,  height_, Length)
+Length PatternElement::heightInherited() {
+    SVG_INHERIT_ATTRIBUTE(PatternElement,  height_, Length)
 }
 
-ViewBox PatternElement::viewBox() {
-    INHERIT_ATTRIBUTE(PatternElement,  view_box_, ViewBox)
+ViewBox PatternElement::viewBoxInherited() {
+    SVG_INHERIT_ATTRIBUTE(PatternElement,  view_box_, ViewBox)
 }
 
-PreserveAspectRatio PatternElement::preserveAspectRatio() {
-    INHERIT_ATTRIBUTE(PatternElement,  preserve_aspect_ratio_, PreserveAspectRatio)
+PreserveAspectRatio PatternElement::preserveAspectRatioInherited() {
+    SVG_INHERIT_ATTRIBUTE(PatternElement,  preserve_aspect_ratio_, PreserveAspectRatio)
 }
 
 void StopElement::parseAttributes(const Dictionary &attrs) {
@@ -495,16 +482,21 @@ void StopElement::parseAttributes(const Dictionary &attrs) {
     parseElementAttributes(attrs) ;
     parseStyleAttributes(attrs, style_) ;
 
-    string offset = attrs.get("offset") ;
-    if ( !offset.empty() ) {
-        Length l = Length::fromString(offset) ;
+
+    string key = "offset", val = attrs.get(key) ;
+
+    if ( !val.empty() ) {
+        Length l ;
+        if ( !l.parse(val) )
+            throw SVGDOMAttributeValueException(key, val) ;
+
         float perc ;
         if ( l.units() == LengthUnitType::Number )
             perc = l.value() ;
         else if ( l.units() == LengthUnitType::Percentage )
             perc = l.value() / 100.0 ;
         else
-            throw SVGDOMAttributeValueException("invalid stop offset value") ;
+            throw SVGDOMAttributeValueException(key, val) ;
 
         offset_.assign(std::min<float>(std::max<float>(perc, 0.0), 1.0)) ;
     }
@@ -517,23 +509,30 @@ void ImageElement::parseAttributes(const Dictionary &attrs)
     parseStyleAttributes(attrs, style_) ;
     parseTransformAttribute(attrs, trans_) ;
 
-    parseAttribute("x", attrs, x_) ;
-    parseAttribute("y", attrs, y_) ;
-    parseAttribute("width", attrs, width_) ;
-    parseAttribute("height", attrs, height_) ;
+    parseOptionalAttribute("x", attrs, x_) ;
+    parseOptionalAttribute("y", attrs, y_) ;
+    parseOptionalAttribute("width", attrs, width_) ;
+    parseOptionalAttribute("height", attrs, height_) ;
 
-    parseAttribute("preserveAspectRatio", attrs, preserve_aspect_ratio_) ;
+    parseOptionalAttribute("preserveAspectRatio", attrs, preserve_aspect_ratio_) ;
 
-    uri_ = attrs.get("xlink:href") ;
+    uri_.assign(attrs.get("xlink:href")) ;
 
 }
 
 void StyleElement::parseAttributes(const Dictionary &attrs) {
     parseElementAttributes(attrs) ;
 
-    media_ = attrs.get("media") ;
-    type_ = attrs.get("type") ;
-    title_ = attrs.get("title") ;
+    for( const auto &lp: attrs ) {
+        string key = lp.first, val = lp.second ;
+
+        if ( key == "media" )
+            media_.assign(val) ;
+        else if ( key == "type" )
+            type_.assign(val) ;
+        else if ( key == "title" )
+            title_.assign(val) ;
+    }
 }
 
 void ClipPathElement::parseAttributes(const Dictionary &attrs)
@@ -544,9 +543,9 @@ void ClipPathElement::parseAttributes(const Dictionary &attrs)
 
     attrs.visit("clipPathUnits", [&](const string &val) {
         if ( val == "userSpaceOnUse" )
-             clip_path_units_ = ClipPathUnits::UserSpaceOnUse ;
+             clip_path_units_.assign(ClipPathUnits::UserSpaceOnUse) ;
          else if ( val == "objectBoundingBox" )
-             clip_path_units_ = ClipPathUnits::ObjectBoundingBox ;
+             clip_path_units_.assign(ClipPathUnits::ObjectBoundingBox) ;
     }) ;
 
 }
@@ -557,12 +556,12 @@ void UseElement::parseAttributes(const Dictionary &attrs)
     parseStyleAttributes(attrs, style_) ;
     parseTransformAttribute(attrs, trans_) ;
 
-    parseAttribute("x", attrs, x_) ;
-    parseAttribute("y", attrs, y_) ;
-    parseAttribute("width", attrs, width_) ;
-    parseAttribute("height", attrs, height_) ;
+    parseOptionalAttribute("x", attrs, x_) ;
+    parseOptionalAttribute("y", attrs, y_) ;
+    parseOptionalAttribute("width", attrs, width_) ;
+    parseOptionalAttribute("height", attrs, height_) ;
 
-    href_ = attrs.get("xlink:href") ;
+    parseOptionalAttribute("xlink:href", attrs, href_) ;
  }
 
 void GroupElement::parseAttributes(const Dictionary &attrs)
@@ -585,7 +584,7 @@ void PathElement::parseAttributes(const Dictionary &attrs)
     parseStyleAttributes(attrs, style_) ;
     parseTransformAttribute(attrs, trans_) ;
 
-    parseAttribute("d", attrs, path_) ;
+    parseOptionalAttribute("d", attrs, data_) ;
 }
 
 void RectElement::parseAttributes(const Dictionary &attrs)
@@ -594,12 +593,12 @@ void RectElement::parseAttributes(const Dictionary &attrs)
     parseStyleAttributes(attrs, style_) ;
     parseTransformAttribute(attrs, trans_) ;
 
-    parseAttribute("x", attrs, x_) ;
-    parseAttribute("y", attrs, y_) ;
-    parseAttribute("width", attrs, width_) ;
-    parseAttribute("height", attrs, height_) ;
-    parseAttribute("rx", attrs, rx_) ;
-    parseAttribute("rx", attrs, ry_) ;
+    parseOptionalAttribute("x", attrs, x_) ;
+    parseOptionalAttribute("y", attrs, y_) ;
+    parseOptionalAttribute("width", attrs, width_) ;
+    parseOptionalAttribute("height", attrs, height_) ;
+    parseOptionalAttribute("rx", attrs, rx_) ;
+    parseOptionalAttribute("rx", attrs, ry_) ;
 }
 
 void CircleElement::parseAttributes(const Dictionary &attrs)
@@ -608,9 +607,9 @@ void CircleElement::parseAttributes(const Dictionary &attrs)
     parseStyleAttributes(attrs, style_) ;
     parseTransformAttribute(attrs, trans_) ;
 
-    parseAttribute("cx", attrs, cx_) ;
-    parseAttribute("cy", attrs, cy_) ;
-    parseAttribute("r", attrs, r_) ;
+    parseOptionalAttribute("cx", attrs, cx_) ;
+    parseOptionalAttribute("cy", attrs, cy_) ;
+    parseOptionalAttribute("r", attrs, r_) ;
 }
 
 void EllipseElement::parseAttributes(const Dictionary &attrs)
@@ -619,10 +618,10 @@ void EllipseElement::parseAttributes(const Dictionary &attrs)
     parseStyleAttributes(attrs, style_) ;
     parseTransformAttribute(attrs, trans_) ;
 
-    parseAttribute("cx", attrs, cx_) ;
-    parseAttribute("cy", attrs, cy_) ;
-    parseAttribute("rx", attrs, rx_) ;
-    parseAttribute("ry", attrs, ry_) ;
+    parseOptionalAttribute("cx", attrs, cx_) ;
+    parseOptionalAttribute("cy", attrs, cy_) ;
+    parseOptionalAttribute("rx", attrs, rx_) ;
+    parseOptionalAttribute("ry", attrs, ry_) ;
 }
 
 void LineElement::parseAttributes(const Dictionary &attrs)
@@ -631,10 +630,10 @@ void LineElement::parseAttributes(const Dictionary &attrs)
     parseStyleAttributes(attrs, style_) ;
     parseTransformAttribute(attrs, trans_) ;
 
-    parseAttribute("x1", attrs, x1_) ;
-    parseAttribute("y1", attrs, y1_) ;
-    parseAttribute("x2", attrs, x2_) ;
-    parseAttribute("y2", attrs, y2_) ;
+    parseOptionalAttribute("x1", attrs, x1_) ;
+    parseOptionalAttribute("y1", attrs, y1_) ;
+    parseOptionalAttribute("x2", attrs, x2_) ;
+    parseOptionalAttribute("y2", attrs, y2_) ;
 }
 
 void PolylineElement::parseAttributes(const Dictionary &attrs)
@@ -643,7 +642,7 @@ void PolylineElement::parseAttributes(const Dictionary &attrs)
     parseStyleAttributes(attrs, style_) ;
     parseTransformAttribute(attrs, trans_) ;
 
-    parseAttribute("points", attrs, points_) ;
+    parseOptionalAttribute("points", attrs, points_) ;
 }
 
 void PolygonElement::parseAttributes(const Dictionary &attrs)
@@ -652,19 +651,20 @@ void PolygonElement::parseAttributes(const Dictionary &attrs)
     parseStyleAttributes(attrs, style_) ;
     parseTransformAttribute(attrs, trans_) ;
 
-    parseAttribute("points", attrs, points_) ;
+    parseOptionalAttribute("points", attrs, points_) ;
 }
 
-void PointList::parse(const string &str)
+bool PointList::parse(const string &str)
 {
     vector<float> pts ;
     if ( !parse_coordinate_list(str, pts) || pts.size() % 2 )
-        throw SVGDOMAttributeValueException("invalid point list") ;
+        return false ;
     for( uint i=0 ; i<pts.size() ; i+=2 )
         points_.emplace_back(pts[i], pts[i+1]) ;
+    return true ;
 }
 
-void PathData::parse(const string &str) {
+bool PathData::parse(const string &str) {
 
      bool inside_group = false, is_first = true ;
      float arg1, arg2, arg3, arg4, arg5, arg6, arg7 ;
@@ -685,7 +685,7 @@ void PathData::parse(const string &str) {
              args = it->str(2) ;
 
              if ( !parse_coordinate_list(args, argList) )
-                 throw SVGDOMAttributeValueException("invalid path data string") ;
+                 return false ;
          }
          else
              cmd = 'z' ;
@@ -817,6 +817,8 @@ void PathData::parse(const string &str) {
 
          ++it ;
      }
+
+     return true ;
 }
 
 
@@ -825,11 +827,11 @@ void SymbolElement::parseAttributes(const Dictionary &attrs) {
     parseStyleAttributes(attrs, style_) ;
     parseViewBoxAttributes(attrs,  view_box_, preserve_aspect_ratio_);
 
-    parseAttribute("width", attrs, width_) ;
-    parseAttribute("height", attrs, height_) ;
+    parseOptionalAttribute("width", attrs, width_) ;
+    parseOptionalAttribute("height", attrs, height_) ;
 
-    parseAttribute("x", attrs, x_) ;
-    parseAttribute("y", attrs, y_) ;
+    parseOptionalAttribute("x", attrs, x_) ;
+    parseOptionalAttribute("y", attrs, y_) ;
 }
 
 // we do not handle glyphs and rotation
@@ -841,28 +843,25 @@ void Element::parseTextPosAttributes(const Dictionary &attrs, OptionalAttribute<
     parseOptionalAttribute("dy", attrs, dy) ;
 }
 
-void TextElement::parseAttributes(const Dictionary &attrs)
-{
+void TextElement::parseAttributes(const Dictionary &attrs) {
     parseElementAttributes(attrs) ;
     parseStyleAttributes(attrs, style_) ;
     parseTransformAttribute(attrs, trans_) ;
     parseTextPosAttributes(attrs, x_, y_, dx_, dy_) ;
 }
 
-void TSpanElement::parseAttributes(const Dictionary &attrs)
-{
+void TSpanElement::parseAttributes(const Dictionary &attrs) {
     parseElementAttributes(attrs) ;
     parseStyleAttributes(attrs, style_) ;
     parseTextPosAttributes(attrs, x_, y_, dx_, dy_) ;
 }
 
-void TRefElement::parseAttributes(const Dictionary &attrs)
-{
+void TRefElement::parseAttributes(const Dictionary &attrs) {
     parseElementAttributes(attrs) ;
     parseStyleAttributes(attrs, style_) ;
     parseTextPosAttributes(attrs, x_, y_, dx_, dy_) ;
 
-    href_ = attrs.get("xlink:href") ;
+    parseOptionalAttribute("xlink:href", attrs, href_) ;
 }
 
 

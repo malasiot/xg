@@ -105,30 +105,30 @@ float RenderingContext::toPixels(const Length &l, LengthDirection dir, bool scal
 }
 
 void RenderingContext::render(SVGElement &e) {
-    pushState(e.style_) ;
+    pushState(e.style()) ;
 
     float xx, yy, sw, sh ;
 
-    xx = toPixels(e.x_, LengthDirection::Horizontal) ;
-    yy = toPixels(e.y_, LengthDirection::Vertical) ;
-    sw = toPixels(e.width_, LengthDirection::Horizontal) ;
-    sh = toPixels(e.height_, LengthDirection::Vertical) ;
+    xx = toPixels(e.x(), LengthDirection::Horizontal) ;
+    yy = toPixels(e.y(), LengthDirection::Vertical) ;
+    sw = toPixels(e.width(), LengthDirection::Horizontal) ;
+    sh = toPixels(e.height(), LengthDirection::Vertical) ;
 
-    ViewBox vbox = e.view_box_ ;
+    ViewBox vbox = e.viewBox() ;
 
     if ( vbox.width_ == 0 ) vbox.width_ = sw ;
     if ( vbox.height_ == 0 ) vbox.height_ = sh ;
 
     view_boxes_.push_back(vbox) ;
 
-    Matrix2d trs = e.preserve_aspect_ratio_.getViewBoxTransform(sw, sh, vbox.width_, vbox.height_, vbox.x_, vbox.y_) ;
+    Matrix2d trs = e.preserveAspectRatio().getViewBoxTransform(sw, sh, vbox.width_, vbox.height_, vbox.x_, vbox.y_) ;
 
     view2dev_ = trs ;
 
     canvas_.save() ;
     canvas_.setTransform(trs) ;
 
-    OverflowType ov = e.style_.getOverflow() ;
+    OverflowType ov = e.style().getOverflow() ;
 
     if ( ov == OverflowType::Scroll || ov == OverflowType::Hidden )
         canvas_.setClipRect(xx, yy, sw, sh) ;
@@ -175,9 +175,9 @@ void RenderingContext::popTransform() {
 
 void RenderingContext::clip(Element &c, const Style &st) {
 
-    string cp_id = st.getClipPath() ;
+    string cp_id = st.getClipPath().id() ;
     if ( !cp_id.empty() ) {
-        Element *p = c.root().resolve(cp_id) ;
+        Element *p = c.document().resolve(cp_id) ;
 
         if ( p ) {
             auto e = dynamic_cast<ClipPathElement *>(p) ;
@@ -216,10 +216,11 @@ void RenderingContext::setShapeAntialias (ShapeQuality aa) {
 
 void RenderingContext::setLinearGradientBrush(LinearGradientElement &e, float a)
 {
-    Length x1 = e.x1(), y1 = e.y1(), x2 = e.x2(), y2 = e.y2() ;
+    Length x1 = e.x1_inherited(), y1 = e.y1_inherited(), x2 = e.x2_inherited(), y2 = e.y2_inherited() ;
 
-    GradientSpreadMethod sm = e.spreadMethod() ;
-    GradientUnits gu = e.gradientUnits() ;
+    GradientSpreadMethod sm = e.spreadMethodInherited() ;
+    GradientUnits gu = e.gradientUnitsInherited() ;
+    Matrix2d gtrans = e.gradientTransformInherited() ;
 
     double ix1, iy1, ix2, iy2 ;
 
@@ -235,7 +236,7 @@ void RenderingContext::setLinearGradientBrush(LinearGradientElement &e, float a)
     ix2 = ( gu == GradientUnits::ObjectBoundingBox ) ?
                 x2.value() : toPixels(x2, LengthDirection::Horizontal) ;
 
-    Matrix2d gtrans = e.gradientTransform() ;
+
 
     if ( gu == GradientUnits::ObjectBoundingBox ) {
         Matrix2d obbm ;
@@ -262,9 +263,9 @@ void RenderingContext::setLinearGradientBrush(LinearGradientElement &e, float a)
     e.collectStops(stop_elements);
 
     for( const StopElement *p: stop_elements ) {
-        const CSSColor &stop_clr = p->style_.getStopColor() ;
-        float stop_opacity =  p->style_.getStopOpacity() ;
-        float offset = p->offset_.value() ;
+        const CSSColor &stop_clr = p->style().getStopColor() ;
+        float stop_opacity =  p->style().getStopOpacity() ;
+        float offset = p->offset() ;
 
         brush.addStop(offset, Color(stop_clr, stop_opacity * a * gopac)) ;
     }
@@ -276,10 +277,11 @@ void RenderingContext::setRadialGradientBrush(RadialGradientElement &e, float a)
 {
     double ifx, ify, icx, icy, ir ;
 
-    Length cx = e.cx(), cy = e.cy(), fx = e.fx(), fy = e.fy(), r = e.r() ;
+    Length cx = e.cx_inherited(), cy = e.cy_inherited(), fx = e.fx_inherited(), fy = e.fy_inherited(), r = e.r_inherited() ;
 
-    GradientSpreadMethod sm = e.spreadMethod() ;
-    GradientUnits gu = e.gradientUnits() ;
+    GradientSpreadMethod sm = e.spreadMethodInherited() ;
+    GradientUnits gu = e.gradientUnitsInherited() ;
+    Matrix2d gtrans = e.gradientTransformInherited() ;
 
 
     icx = ( gu == GradientUnits::ObjectBoundingBox ) ?
@@ -297,7 +299,6 @@ void RenderingContext::setRadialGradientBrush(RadialGradientElement &e, float a)
     ir = ( gu == GradientUnits::ObjectBoundingBox ) ?
                 r.value() : toPixels(r, LengthDirection::Absolute) ;
 
-    Matrix2d gtrans = e.gradientTransform() ;
 
     if ( gu == GradientUnits::ObjectBoundingBox ) {
         Matrix2d obbm ;
@@ -324,9 +325,9 @@ void RenderingContext::setRadialGradientBrush(RadialGradientElement &e, float a)
     e.collectStops(stop_elements);
 
     for( const StopElement *p: stop_elements ) {
-        const CSSColor &stop_clr = p->style_.getStopColor() ;
-        float stop_opacity =  p->style_.getStopOpacity() ;
-        float offset = p->offset_.value() ;
+        const CSSColor &stop_clr = p->style().getStopColor() ;
+        float stop_opacity =  p->style().getStopOpacity() ;
+        float offset = p->offset() ;
 
         brush.addStop(offset, Color(stop_clr, stop_opacity * a * gopac)) ;
     }
@@ -337,9 +338,9 @@ void RenderingContext::setRadialGradientBrush(RadialGradientElement &e, float a)
 
 void RenderingContext::setPatternBrush(PatternElement &e, float a)
 {
-    Length px = e.x(), py = e.y(), pw = e.width(), ph = e.height() ;
-    PatternUnits pu = e.patternUnits(), pcu = e.patternContentUnits() ;
-    Matrix2d trans = e.patternTransform() ;
+    Length px = e.xInherited(), py = e.yInherited(), pw = e.widthInherited(), ph = e.heightInherited() ;
+    PatternUnits pu = e.patternUnitsInherited(), pcu = e.patternContentUnitsInherited() ;
+    Matrix2d trans = e.patternTransformInherited() ;
 
     double tile_w = ( pu == PatternUnits::ObjectBoundingBox ) ? pw.value() * obbox_.width() : toPixels(pw, LengthDirection::Horizontal) ;
     double tile_h = ( pu == PatternUnits::ObjectBoundingBox ) ? ph.value() * obbox_.height(): toPixels(ph, LengthDirection::Vertical) ;
@@ -348,8 +349,8 @@ void RenderingContext::setPatternBrush(PatternElement &e, float a)
 
     Matrix2d tile_transform, pattern_transform ;
 
-    if ( e.hasViewBox() ) {
-        ViewBox vbox = e.viewBox() ;
+    if ( e.viewBoxIsSet() ) {
+        ViewBox vbox = e.viewBoxInherited() ;
         tile_transform = e.preserveAspectRatio().getViewBoxTransform(tile_w, tile_h, vbox.width_, vbox.height_, vbox.x_, vbox.y_) ;
     }
     else {
@@ -403,8 +404,8 @@ void RenderingContext::setPaint(Element &e)
 
     Paint stroke_paint = st.getStrokePaint() ;
 
-    if ( stroke_paint.type_ == PaintType::None ) ;
-    else if ( stroke_paint.type_ == PaintType::SolidColor ) {
+    if ( stroke_paint.type() == PaintType::None ) ;
+    else if ( stroke_paint.type() == PaintType::SolidColor ) {
         Pen pen ;
         pen.setLineWidth(toPixels(st.getStrokeWidth(), LengthDirection::Absolute)) ;
         pen.setMiterLimit(st.getMiterLimit()) ;
@@ -433,7 +434,7 @@ void RenderingContext::setPaint(Element &e)
             break ;
         }
 
-        std::vector<Length> dash_array = st.getDashArray() ;
+        const auto &dash_array = st.getDashArray().values() ;
 
         if ( !dash_array.empty() ) {
             vector<double> dashes ;
@@ -448,7 +449,7 @@ void RenderingContext::setPaint(Element &e)
 
         float stroke_opacity = st.getStrokeOpacity() ;
         float opacity = st.getOpacity() ;
-        const CSSColor &css_clr = stroke_paint.clr_or_server_id_.get<CSSColor>() ;
+        const CSSColor &css_clr = stroke_paint.color() ;
         Color clr(css_clr, stroke_opacity * opacity) ;
         pen.setColor(clr) ;
 
@@ -457,11 +458,11 @@ void RenderingContext::setPaint(Element &e)
 
     Paint fill_paint = st.getFillPaint() ;
 
-    if ( fill_paint.type_ == PaintType::None ) ;
-    else if ( fill_paint.type_ == PaintType::SolidColor ) {
+    if ( fill_paint.type() == PaintType::None ) ;
+    else if ( fill_paint.type() == PaintType::SolidColor ) {
         float fill_opacity = st.getFillOpacity() ;
         float opacity = st.getOpacity() ;
-        const CSSColor &css_clr = fill_paint.clr_or_server_id_.get<CSSColor>() ;
+        const CSSColor &css_clr = fill_paint.color() ;
         Color clr(css_clr, fill_opacity * opacity) ;
 
         FillRule fill_rule = st.getFillRule() ;
@@ -477,10 +478,10 @@ void RenderingContext::setPaint(Element &e)
 
 
     }
-    else if ( fill_paint.type_ == PaintType::PaintServer ) {
+    else if ( fill_paint.type() == PaintType::PaintServer ) {
 
-        string ps_id = fill_paint.clr_or_server_id_.get<string>() ;
-        Element *elem = e.root().resolve(ps_id) ;
+        string ps_id = fill_paint.serverId() ;
+        Element *elem = e.document().resolve(ps_id) ;
 
         float fill_opacity = st.getFillOpacity() ;
 
@@ -509,10 +510,10 @@ void RenderingContext::applyClipPath(ClipPathElement *cp)
 {
     RenderingContext clipCtx(canvas_, RenderingMode::Cliping) ;
 
-    clipCtx.clip(*cp, cp->style_) ;
+    clipCtx.clip(*cp, cp->style()) ;
 
-    clipCtx.pushState(cp->style_) ;
-    clipCtx.pushTransform(cp->trans_) ;
+    clipCtx.pushState(cp->style()) ;
+    clipCtx.pushTransform(cp->trans()) ;
 
     for( auto c: cp->children() ) {
         clipCtx.clip(c.get()) ;
@@ -520,7 +521,7 @@ void RenderingContext::applyClipPath(ClipPathElement *cp)
 
     xg::FillRule fr ;
 
-    if ( cp->style_.getFillRule() == FillRule::EvenOdd )
+    if ( cp->style().getFillRule() == FillRule::EvenOdd )
       fr = xg::FillRule::EvenOdd ;
     else
       fr = xg::FillRule::NonZero ;
@@ -532,13 +533,13 @@ void RenderingContext::applyClipPath(ClipPathElement *cp)
 
 void RenderingContext::render(LineElement &e)
 {
-    double x1 = toPixels(e.x1_, LengthDirection::Horizontal) ;
-    double y1 = toPixels(e.y1_, LengthDirection::Vertical) ;
-    double x2 = toPixels(e.x2_, LengthDirection::Horizontal) ;
-    double y2 = toPixels(e.y2_, LengthDirection::Vertical) ;
+    double x1 = toPixels(e.x1(), LengthDirection::Horizontal) ;
+    double y1 = toPixels(e.y1(), LengthDirection::Vertical) ;
+    double x2 = toPixels(e.x2(), LengthDirection::Horizontal) ;
+    double y2 = toPixels(e.y2(), LengthDirection::Vertical) ;
 
     if  ( rendering_mode_ == RenderingMode::Display ) {
-        preRenderShape(e, e.style_, e.trans_, Rectangle2d()) ;
+        preRenderShape(e, e.style(), e.trans(), Rectangle2d()) ;
         setPaint(e) ;
         canvas_.drawLine(x1, y1, x2, y2) ;
         postRenderShape() ;
@@ -548,19 +549,19 @@ void RenderingContext::render(LineElement &e)
 
 void RenderingContext::render(PolygonElement &e)
 {
-    const auto &pts = e.points_.points_;
+    const auto &pts = e.points().points();
     if ( pts.size() == 0 ) return ;
 
     Path p ;
     p.addPolygon(pts) ;
 
     if  ( rendering_mode_ == RenderingMode::Display ) {
-        preRenderShape(e, e.style_, e.trans_, p.extents()) ;
+        preRenderShape(e, e.style(), e.trans(), p.extents()) ;
         setPaint(e) ;
         canvas_.drawPath(p) ;
         postRenderShape() ;
     } else {
-        pushTransform(e.trans_) ;
+        pushTransform(e.trans()) ;
         addClipPath(p) ;
         popTransform() ;
     }
@@ -568,19 +569,19 @@ void RenderingContext::render(PolygonElement &e)
 
 void RenderingContext::render(PolylineElement &e)
 {
-    const auto &pts = e.points_.points_;
+    const auto &pts = e.points().points();
     if ( pts.size() == 0 ) return ;
 
     Path p ;
     p.addPolyline(pts) ;
 
     if  ( rendering_mode_ == RenderingMode::Display ) {
-        preRenderShape(e, e.style_, e.trans_, p.extents()) ;
+        preRenderShape(e, e.style(), e.trans(), p.extents()) ;
         setPaint(e) ;
         canvas_.drawPath(p) ;
         postRenderShape() ;
     } else {
-        pushTransform(e.trans_) ;
+        pushTransform(e.trans()) ;
         addClipPath(p) ;
         popTransform() ;
     }
@@ -588,15 +589,15 @@ void RenderingContext::render(PolylineElement &e)
 }
 
 void RenderingContext::render(PathElement &e) {
-    const auto &p = e.path_.path_ ;
+    const auto &p = e.data().path() ;
 
     if  ( rendering_mode_ == RenderingMode::Display ) {
-        preRenderShape(e, e.style_, e.trans_, p.extents()) ;
+        preRenderShape(e, e.style(), e.trans(), p.extents()) ;
         setPaint(e) ;
         canvas_.drawPath(p) ;
         postRenderShape() ;
     } else {
-        pushTransform(e.trans_) ;
+        pushTransform(e.trans()) ;
         addClipPath(p) ;
         popTransform() ;
     }
@@ -604,12 +605,12 @@ void RenderingContext::render(PathElement &e) {
 
 void RenderingContext::render(RectElement &rect)
 {
-    double rxp = toPixels(rect.rx_, LengthDirection::Horizontal) ;
-    double ryp = toPixels(rect.ry_, LengthDirection::Vertical) ;
-    double xp = toPixels(rect.x_, LengthDirection::Horizontal) ;
-    double yp = toPixels(rect.y_, LengthDirection::Vertical) ;
-    double wp = toPixels(rect.width_, LengthDirection::Horizontal) ;
-    double hp = toPixels(rect.height_, LengthDirection::Vertical) ;
+    double rxp = toPixels(rect.rx(), LengthDirection::Horizontal) ;
+    double ryp = toPixels(rect.ry(), LengthDirection::Vertical) ;
+    double xp = toPixels(rect.x(), LengthDirection::Horizontal) ;
+    double yp = toPixels(rect.y(), LengthDirection::Vertical) ;
+    double wp = toPixels(rect.width(), LengthDirection::Horizontal) ;
+    double hp = toPixels(rect.height(), LengthDirection::Vertical) ;
 
     if (rxp > fabs (wp / 2.)) rxp = fabs (wp / 2.);
     if (ryp > fabs (hp / 2.)) ryp = fabs (hp / 2.);
@@ -618,12 +619,12 @@ void RenderingContext::render(RectElement &rect)
     else if (ryp == 0) ryp = rxp ;
 
     if  ( rendering_mode_ == RenderingMode::Display ) {
-        preRenderShape(rect, rect.style_, rect.trans_, Rectangle2d(xp, yp, wp, hp)) ;
+        preRenderShape(rect, rect.style(), rect.trans(), Rectangle2d(xp, yp, wp, hp)) ;
         setPaint(rect) ;
         canvas_.drawPath(Path().addRoundedRect(xp, yp, wp, hp, rxp, ryp)) ;
         postRenderShape() ;
     } else {
-        pushTransform(rect.trans_) ;
+        pushTransform(rect.trans()) ;
         addClipPath(Path().addRoundedRect(xp, yp, wp, hp, rxp, ryp)) ;
         popTransform() ;
     }
@@ -631,18 +632,18 @@ void RenderingContext::render(RectElement &rect)
 
 void RenderingContext::render(EllipseElement &e)
 {
-    double cx = toPixels(e.cx_, LengthDirection::Horizontal) ;
-    double cy = toPixels(e.cy_, LengthDirection::Vertical) ;
-    double rx = toPixels(e.rx_, LengthDirection::Horizontal) ;
-    double ry = toPixels(e.ry_, LengthDirection::Vertical) ;
+    double cx = toPixels(e.cx(), LengthDirection::Horizontal) ;
+    double cy = toPixels(e.cy(), LengthDirection::Vertical) ;
+    double rx = toPixels(e.rx(), LengthDirection::Horizontal) ;
+    double ry = toPixels(e.ry(), LengthDirection::Vertical) ;
 
     if  ( rendering_mode_ == RenderingMode::Display ) {
-        preRenderShape(e, e.style_, e.trans_, Rectangle2d(cx-rx, cy-ry, 2*rx, 2*ry)) ;
+        preRenderShape(e, e.style(), e.trans(), Rectangle2d(cx-rx, cy-ry, 2*rx, 2*ry)) ;
         setPaint(e) ;
         canvas_.drawEllipse(cx, cy, rx, ry) ;
         postRenderShape() ;
     } else {
-        pushTransform(e.trans_) ;
+        pushTransform(e.trans()) ;
         addClipPath(Path().addEllipse(cx, cy, rx, ry)) ;
         popTransform() ;
     }
@@ -651,17 +652,17 @@ void RenderingContext::render(EllipseElement &e)
 
 void RenderingContext::render(CircleElement &e)
 {
-    double cx = toPixels(e.cx_, LengthDirection::Horizontal) ;
-    double cy = toPixels(e.cy_, LengthDirection::Vertical) ;
-    double r = toPixels(e.r_, LengthDirection::Absolute) ;
+    double cx = toPixels(e.cx(), LengthDirection::Horizontal) ;
+    double cy = toPixels(e.cy(), LengthDirection::Vertical) ;
+    double r = toPixels(e.r(), LengthDirection::Absolute) ;
 
     if  ( rendering_mode_ == RenderingMode::Display ) {
-        preRenderShape(e, e.style_, e.trans_, Rectangle2d(cx-r, cy-r, 2*r, 2*r)) ;
+        preRenderShape(e, e.style(), e.trans(), Rectangle2d(cx-r, cy-r, 2*r, 2*r)) ;
         setPaint(e) ;
         canvas_.drawCircle(cx, cy, r) ;
         postRenderShape() ;
     } else {
-        pushTransform(e.trans_) ;
+        pushTransform(e.trans()) ;
         addClipPath(Path().addEllipse(cx, cy, r, r)) ;
         popTransform() ;
     }
@@ -669,32 +670,32 @@ void RenderingContext::render(CircleElement &e)
 
 void RenderingContext::render(ImageElement &e) {
 
-    if ( e.uri_.empty() ) return ;
+    if ( e.uri().empty() ) return ;
 
-     pushState(e.style_) ;
-     pushTransform(e.trans_) ;
+     pushState(e.style()) ;
+     pushTransform(e.trans()) ;
 
      canvas_.save() ;
-     canvas_.setTransform(e.trans_);
+     canvas_.setTransform(e.trans());
 
      Style &st = states_.back() ;
 
-     float ix = toPixels(e.x_, LengthDirection::Horizontal) ;
-     float iy = toPixels(e.y_, LengthDirection::Vertical) ;
-     float iw = toPixels(e.width_, LengthDirection::Horizontal) ;
-     float ih = toPixels(e.height_, LengthDirection::Vertical) ;
+     float ix = toPixels(e.x(), LengthDirection::Horizontal) ;
+     float iy = toPixels(e.y(), LengthDirection::Vertical) ;
+     float iw = toPixels(e.width(), LengthDirection::Horizontal) ;
+     float ih = toPixels(e.height(), LengthDirection::Vertical) ;
 
      if ( iw == 0.0 || ih == 0 ) return ;
 
      float opc = st.getOpacity() ;
 
-     Image im = e.root().loadImageResource(e.uri_, &e);
+     Image im = e.document().loadImageResource(e.uri(), &e);
      if ( !im.pixels() ) return ;
 
      double width = im.width() ;
      double height = im.height() ;
 
-     Matrix2d trs = e.preserve_aspect_ratio_.getViewBoxTransform(iw, ih, width, height, 0, 0 ) ;
+     Matrix2d trs = e.preserveAspectRatio().getViewBoxTransform(iw, ih, width, height, 0, 0 ) ;
 
      trs.translate(ix, iy) ;
 
@@ -797,19 +798,19 @@ Font RenderingContext::makeFont(const Style &st)
 
 void RenderingContext::render(TextElement &e)
 {
-    pushState(e.style_) ;
-    pushTransform(e.trans_) ;
+    pushState(e.style()) ;
+    pushTransform(e.trans()) ;
 
     canvas_.save() ;
-    canvas_.setTransform(e.trans_);
+    canvas_.setTransform(e.trans());
 
     double x, y, dx, dy ;
 
-    x = toPixels(e.x_.value(), LengthDirection::Horizontal) ;
-    y = toPixels(e.y_.value(), LengthDirection::Vertical) ;
+    x = toPixels(e.x(), LengthDirection::Horizontal) ;
+    y = toPixels(e.y(), LengthDirection::Vertical) ;
 
-    dx = toPixels(e.dx_.value(), LengthDirection::Horizontal) ;
-    dy = toPixels(e.dy_.value(), LengthDirection::Vertical) ;
+    dx = toPixels(e.dx(), LengthDirection::Horizontal) ;
+    dy = toPixels(e.dy(), LengthDirection::Vertical) ;
 
     cursor_x_ = x + dx ;
     cursor_y_ = y + dy ;
@@ -832,17 +833,17 @@ void RenderingContext::render(TSpanElement &e)
 {
     if ( e.text_.empty() ) return ;
 
-    pushState(e.style_) ;
+    pushState(e.style()) ;
 
     Style &st = states_.back() ;
 
     double x, y, dx, dy ;
 
-    x = ( e.x_.hasValue() ) ? toPixels(e.x_.value(), LengthDirection::Horizontal) : cursor_x_ ;
-    y = ( e.y_.hasValue() ) ? toPixels(e.y_.value(), LengthDirection::Vertical) : cursor_y_ ;
+    x = ( e.xIsSet() ) ? toPixels(e.x(), LengthDirection::Horizontal) : cursor_x_ ;
+    y = ( e.yIsSet() ) ? toPixels(e.y(), LengthDirection::Vertical) : cursor_y_ ;
 
-    dx = toPixels(e.dx_.value(), LengthDirection::Horizontal) ;
-    dy = toPixels(e.dy_.value(), LengthDirection::Vertical) ;
+    dx = toPixels(e.dx(), LengthDirection::Horizontal) ;
+    dy = toPixels(e.dy(), LengthDirection::Vertical) ;
 
     Font f = makeFont(st) ;
 
@@ -898,9 +899,9 @@ void RenderingContext::render(TSpanElement &e)
 
 void RenderingContext::render(TRefElement &e)
 {
-    Element *eref = e.root().resolve(e.href_) ;
+    Element *eref = e.document().resolve(e.href().uri()) ;
 
-    pushState(e.style_) ;
+    pushState(e.style()) ;
 
     canvas_.save() ;
 
@@ -974,29 +975,29 @@ void RenderingContext::addClipPath(const Path &p)
 
 void RenderingContext::render(SymbolElement &e, double pw, double ph)
 {
-    pushState(e.style_) ;
+    pushState(e.style()) ;
 
     float xx, yy, sw, sh ;
 
-    xx = toPixels(e.x_, LengthDirection::Horizontal) ;
-    yy = toPixels(e.y_, LengthDirection::Vertical) ;
+    xx = toPixels(e.x(), LengthDirection::Horizontal) ;
+    yy = toPixels(e.y(), LengthDirection::Vertical) ;
 
-    sw = ( pw == 0 ) ? toPixels(e.width_, LengthDirection::Horizontal) : pw ;
-    sh = ( ph == 0 ) ? toPixels(e.height_, LengthDirection::Vertical) : ph ;
+    sw = ( pw == 0 ) ? toPixels(e.width(), LengthDirection::Horizontal) : pw ;
+    sh = ( ph == 0 ) ? toPixels(e.height(), LengthDirection::Vertical) : ph ;
 
-    ViewBox vbox = e.view_box_ ;
+    ViewBox vbox = e.viewBox() ;
 
     if ( vbox.width_ == 0 ) vbox.width_ = sw ;
     if ( vbox.height_ == 0 ) vbox.height_ = sh ;
 
     view_boxes_.push_back(vbox) ;
 
-    Matrix2d trs = e.preserve_aspect_ratio_.getViewBoxTransform(sw, sh, vbox.width_, vbox.height_, vbox.x_, vbox.y_) ;
+    Matrix2d trs = e.preserveAspectRatio().getViewBoxTransform(sw, sh, vbox.width_, vbox.height_, vbox.x_, vbox.y_) ;
 
     canvas_.save() ;
     canvas_.setTransform(trs) ;
 
-    OverflowType ov = e.style_.getOverflow() ;
+    OverflowType ov = e.style().getOverflow() ;
 
     if ( ov == OverflowType::Scroll || ov == OverflowType::Hidden )
         canvas_.setClipRect(xx, yy, sw, sh) ;
@@ -1011,27 +1012,27 @@ void RenderingContext::render(SymbolElement &e, double pw, double ph)
 }
 
 void RenderingContext::render(GroupElement &g) {
-     preRenderShape(g, g.style_, g.trans_, Rectangle2d()) ;
+     preRenderShape(g, g.style(), g.trans(), Rectangle2d()) ;
      renderChildren(g) ;
      postRenderShape() ;
 }
 
 void RenderingContext::render(UseElement &e)
 {
-    Element * eref  = e.root().resolve(e.href_) ;
+    Element * eref  = e.document().resolve(e.href().uri()) ;
     if ( !eref ) return ;
 
-    float xx = toPixels(e.x_, LengthDirection::Horizontal) ;
-    float yy = toPixels(e.y_, LengthDirection::Vertical) ;
-    float sw = toPixels(e.width_, LengthDirection::Horizontal) ;
-    float sh = toPixels(e.height_, LengthDirection::Vertical) ;
+    float xx = toPixels(e.x(), LengthDirection::Horizontal) ;
+    float yy = toPixels(e.y(), LengthDirection::Vertical) ;
+    float sw = toPixels(e.width(), LengthDirection::Horizontal) ;
+    float sh = toPixels(e.height(), LengthDirection::Vertical) ;
 
-    Matrix2d trc = Matrix2d::translation(xx, yy), trans = e.trans_ ;
+    Matrix2d trc = Matrix2d::translation(xx, yy), trans = e.trans() ;
 
     trc.premult(trans) ;
 
     if ( rendering_mode_ == RenderingMode::Display ) {
-        pushState(e.style_) ;
+        pushState(e.style()) ;
         pushTransform(trc) ;
 
         canvas_.save() ;

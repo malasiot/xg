@@ -80,9 +80,9 @@ static bool parse_units(char *&c, LengthUnitType &units) {
     return true ;
 }
 
-void Length::parse(const std::string &str)  {
+bool Length::parse(const std::string &str)  {
 
-    if ( str.empty() ) return ;
+    if ( str.empty() ) return false ;
 
     const char *c_start = str.c_str() ;
 
@@ -91,50 +91,43 @@ void Length::parse(const std::string &str)  {
 
     // failed to parse number
     if ( c_end == c_start )  {
-        throw SVGDOMAttributeValueException("invalid number") ;
+        return false ;
     }
     while ( isspace(*c_end) ) ++c_end ;
 
     unit_type_ = LengthUnitType::Unknown ;
 
-    if ( ! parse_units(c_end, unit_type_) ) {
-        throw SVGDOMAttributeValueException("invalid units") ;
-    }
+    if ( ! parse_units(c_end, unit_type_) ) return false ;
+
+    return true ;
 }
 
-std::vector<Length> Length::parseList(const string &str)
+bool LengthList::parse(const string &str)
 {
-    vector<Length> vl ;
-
-    if ( str.empty() ) return vl;
+    if ( str.empty() ) return true;
 
     const char *c_start = str.c_str() ;
 
     char *c_end ;
 
     do {
-    float value = strtof(c_start, &c_end) ;
+        float value = strtof(c_start, &c_end) ;
 
-    // failed to parse number
-    if ( c_end == c_start )  {
-        throw SVGDOMAttributeValueException("invalid number") ;
-    }
+        // failed to parse number
+        if ( c_end == c_start )  return false ;
 
+        LengthUnitType unit_type = LengthUnitType::Number ;
 
-    LengthUnitType unit_type = LengthUnitType::Number ;
+        if ( ! parse_units(c_end, unit_type) )  return false ;
 
-    if ( ! parse_units(c_end, unit_type) ) {
-        throw SVGDOMAttributeValueException("invalid units") ;
-    }
+        values_.emplace_back(value, unit_type) ;
 
-    vl.emplace_back(value, unit_type) ;
+        while ( *c_end && ( isspace(*c_end) || *c_end == ',' ) ) ++c_end ;
 
-    while ( *c_end && ( isspace(*c_end) || *c_end == ',' ) ) ++c_end ;
-
-    c_start = c_end ;
+        c_start = c_end ;
     } while ( *c_end != 0 ) ;
 
-    return vl ;
+    return true ;
 }
 
 

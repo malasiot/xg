@@ -86,7 +86,7 @@ public:
     }
 
     template <typename T, typename = typename std::enable_if<is_one_of<T, Ts...>::value, void>::type>
-    T get() const {
+    const T &get() const {
         // It is a dynamic_cast-like behaviour
         if (type_id_ == typeid(T).hash_code())
             return *reinterpret_cast<const T*>(&data_);

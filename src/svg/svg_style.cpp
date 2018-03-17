@@ -10,302 +10,353 @@ namespace xg {
 namespace svg {
 
 
-void Style::parsePaint(const std::string &val, Paint &p, Element *r, bool fill)
+bool Paint::parse(const std::string &val)
 {
     if ( val == "none" )
-        p.type_ = PaintType::None ;
+        type_ = PaintType::None ;
     else if ( val == "currentColor" )
-        p.type_ = PaintType::CurrentColor ;
+        type_ = PaintType::CurrentColor ;
     else if ( startsWith(val, "url") ) {
         string id = parse_uri(val) ;
 
         if ( !id.empty() ) {
-            p.clr_or_server_id_.set<string>(id) ;
-            p.type_ = PaintType::PaintServer ;
+            clr_or_server_id_.set<string>(id) ;
+            type_ = PaintType::PaintServer ;
         }
-        else throw SVGDOMAttributeValueException("invalid paint url") ;
+        else return false ;
     }
     else
     {
         try {
             CSSColor clr(val) ;
 
-            p.clr_or_server_id_.set<CSSColor>(clr) ;
-            p.type_ = PaintType::SolidColor ;
+            clr_or_server_id_.set<CSSColor>(clr) ;
+            type_ = PaintType::SolidColor ;
         }
         catch ( CSSColorParseException &e ) {
-            throw SVGDOMAttributeValueException(e.what()) ;
+            return false ;
         }
     }
+
+    return true ;
 }
 
-void Style::parseNameValue(const string &name, const string &value, Element *e) {
+bool Style::parseOpacity(const string &str, float &v) {
+    return parse_number(str, v) ;
+}
+
+void Style::parseNameValue(const string &name, const string &value) {
     string val = trimCopy(value) ;
 
     if ( val == "inherit" ) return ;
 
     if ( name == "fill-rule" )  {
         if ( val == "nonzero" )
-            setAttribute<FillRule>(StyleAttributeType::FillRule, FillRule::NonZero) ;
+            setFillRule(FillRule::NonZero) ;
         else if ( val == "evenodd" )
-            setAttribute<FillRule>(StyleAttributeType::FillRule, FillRule::NonZero) ;
+            setFillRule(FillRule::EvenOdd) ;
     }
     else if ( name == "fill-opacity" )  {
         float v ;
-        if ( parse_number(val, v) )
-            setAttribute<float>(StyleAttributeType::FillOpacity, v) ;
-
+        if ( parseOpacity(val, v) ) setFillOpacity(v) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "stroke-opacity" )  {
         float v ;
-        if ( parse_number(val, v) )
-            setAttribute<float>(StyleAttributeType::StrokeOpacity, v) ;
-
+        if ( parseOpacity(val, v) ) setStrokeOpacity(v) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "opacity" )  {
         float v ;
-        if ( parse_number(val, v) )
-            setAttribute<float>(StyleAttributeType::Opacity, v) ;
+        if ( parseOpacity(val, v) ) setOpacity(v) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
-    else if ( name == "stoke-opacity" ) {
-        float v ;
-        if ( parse_number(val, v) )
-            setAttribute<float>(StyleAttributeType::StrokeOpacity, v) ;
+    else if ( name == "clip-rule" ) {
+        if ( val == "nonzero" )
+            setClipRule(ClipRule::NonZero) ;
+        else if ( val == "evenodd" )
+            setClipRule(ClipRule::EvenOdd) ;
     }
-    else if ( name == "clip-rule" ) ;
     else if ( name == "fill") {
-        FillPaint p ;
-        parsePaint(val, p, e, true) ;
-        setAttribute<FillPaint>(StyleAttributeType::Fill, p) ;
+        parseAttribute(name, val, fill_paint_) ;
     }
     else if ( name == "stroke" )
     {
-        StrokePaint p ;
-        parsePaint(val, p, e, false) ;
-        setAttribute<StrokePaint>(StyleAttributeType::Stroke, p) ;
+        parseAttribute(name, val, stroke_paint_) ;
     }
     else if ( name == "stroke-width" ) {
-        Length sw = Length::fromString(val) ;
-        setAttribute<Length>(StyleAttributeType::StrokeWidth, sw) ;
+        parseAttribute(name, val, stroke_width_) ;
     }
     else if ( name == "stroke-miterlimit" ) {
         float v ;
         if ( parse_number(val, v) )
-            setAttribute<float>(StyleAttributeType::StrokeMiterLimit, v) ;
+            setMiterLimit(v) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "stroke-dasharray" ) {
         if ( val == "none" ) ;
         else {
-            vector<Length> dash_array = Length::parseList(val) ;
-            setAttribute<vector<Length>>(StyleAttributeType::StrokeDashArray, dash_array) ;
+            parseAttribute(name, val, dash_array_) ;
         }
     }
     else if ( name == "stroke-dashoffset" ) {
-        setAttribute<Length>(StyleAttributeType::StrokeDashOffset, Length::fromString(val)) ;
+        parseAttribute(name, val, dash_offset_) ;
     }
     else if ( name == "stroke-linejoin" )  {
         if ( val == "miter" )
-            setAttribute<LineJoinType>(StyleAttributeType::StrokeLineJoin, LineJoinType::Miter) ;
+            setLineJoin(LineJoinType::Miter) ;
         else if ( val == "round" )
-            setAttribute<LineJoinType>(StyleAttributeType::StrokeLineJoin, LineJoinType::Round) ;
+            setLineJoin(LineJoinType::Round) ;
         else if ( val == "bevel" )
-            setAttribute<LineJoinType>(StyleAttributeType::StrokeLineJoin, LineJoinType::Bevel) ;
+            setLineJoin(LineJoinType::Bevel) ;
     }
     else if ( name == "stroke-linecap" )  {
         if ( val == "butt" )
-            setAttribute<LineCapType>(StyleAttributeType::StrokeLineCap, LineCapType::Butt) ;
+            setLineCap(LineCapType::Butt) ;
         else if ( val == "round" )
-            setAttribute<LineCapType>(StyleAttributeType::StrokeLineCap, LineCapType::Round) ;
+            setLineCap(LineCapType::Round) ;
         else if ( val == "square" )
-            setAttribute<LineCapType>(StyleAttributeType::StrokeLineCap, LineCapType::Square) ;
+            setLineCap(LineCapType::Square) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "font-family" ) {
-        setAttribute<string>(StyleAttributeType::FontFamily, val) ;
+        setFontFamily(val) ;
     }
     else if ( name == "font-style" ) {
         if ( val == "normal" )
-            setAttribute<FontStyle>(StyleAttributeType::FontStyle, FontStyle::Normal) ;
+            setFontStyle(FontStyle::Normal) ;
         else if ( val == "oblique" )
-            setAttribute<FontStyle>(StyleAttributeType::FontStyle, FontStyle::Oblique) ;
+            setFontStyle(FontStyle::Oblique) ;
         else if ( val == "italic" )
-            setAttribute<FontStyle>(StyleAttributeType::FontStyle, FontStyle::Italic) ;
+            setFontStyle(FontStyle::Italic) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "font-variant" ) {
         if ( val == "normal" )
-            setAttribute<FontVariant>(StyleAttributeType::FontVariant, FontVariant::Normal) ;
+            setFontVariant(FontVariant::Normal) ;
         else if ( val == "small-caps" )
-            setAttribute<FontVariant>(StyleAttributeType::FontVariant, FontVariant::SmallCaps) ;
+            setFontVariant(FontVariant::SmallCaps) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "font-weight" ) {
         if ( val == "normal" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::Normal) ;
+            setFontWeight(FontWeight::Normal) ;
         else if ( val == "bold" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::Bold) ;
+            setFontWeight(FontWeight::Bold) ;
         else if ( val == "bolder" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::Bolder) ;
+            setFontWeight(FontWeight::Bolder) ;
         else if ( val == "lighter" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::Lighter) ;
+            setFontWeight(FontWeight::Lighter) ;
         else if ( val == "100" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::W100) ;
+            setFontWeight(FontWeight::W100) ;
         else if ( val == "200" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::W200) ;
+            setFontWeight(FontWeight::W200) ;
         else if ( val == "300" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::W300) ;
+            setFontWeight(FontWeight::W300) ;
         else if ( val == "400" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::W400) ;
+            setFontWeight(FontWeight::W400) ;
         else if ( val == "500" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::W500) ;
+            setFontWeight(FontWeight::W500) ;
         else if ( val == "600" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::W600) ;
+            setFontWeight(FontWeight::W600) ;
         else if ( val == "700" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::W700) ;
+            setFontWeight(FontWeight::W700) ;
         else if ( val == "800" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::W800) ;
+            setFontWeight(FontWeight::W800) ;
         else if ( val == "900" )
-            setAttribute<FontWeight>(StyleAttributeType::FontWeight, FontWeight::W900) ;
+            setFontWeight(FontWeight::W900) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "font-stretch" ) {
         if ( val == "ultra-condensed" )
-            setAttribute<FontStretch>(StyleAttributeType::FontStretch, FontStretch::UltraCondensed) ;
+            setFontStretch(FontStretch::UltraCondensed) ;
         else if ( val == "extra-condensed" )
-            setAttribute<FontStretch>(StyleAttributeType::FontStretch, FontStretch::ExtraCondensed) ;
+            setFontStretch(FontStretch::ExtraCondensed) ;
         else if ( val == "condensed" )
-            setAttribute<FontStretch>(StyleAttributeType::FontStretch, FontStretch::Condensed) ;
+            setFontStretch(FontStretch::Condensed) ;
         else if ( val == "narrower" )
-            setAttribute<FontStretch>(StyleAttributeType::FontStretch, FontStretch::Narrower) ;
+            setFontStretch(FontStretch::Narrower) ;
         else if ( val == "semi-condensed" )
-            setAttribute<FontStretch>(StyleAttributeType::FontStretch, FontStretch::SemiCondensed) ;
+            setFontStretch(FontStretch::SemiCondensed) ;
         else if ( val == "semi-expanded" )
-            setAttribute<FontStretch>(StyleAttributeType::FontStretch, FontStretch::SemiExpanded) ;
+            setFontStretch(FontStretch::SemiExpanded) ;
         else if ( val == "expanded" )
-            setAttribute<FontStretch>(StyleAttributeType::FontStretch, FontStretch::Expanded) ;
+            setFontStretch(FontStretch::Expanded) ;
         else if ( val == "wider" )
-            setAttribute<FontStretch>(StyleAttributeType::FontStretch, FontStretch::Wider) ;
+            setFontStretch(FontStretch::Wider) ;
         else if ( val == "extra-expanded" )
-            setAttribute<FontStretch>(StyleAttributeType::FontStretch, FontStretch::ExtraExpanded) ;
+            setFontStretch(FontStretch::ExtraExpanded) ;
         else if ( val == "ultra-expanded" )
-            setAttribute<FontStretch>(StyleAttributeType::FontStretch, FontStretch::UltraExpanded) ;
+            setFontStretch(FontStretch::UltraExpanded) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "font-size" )  {
-        if ( val == "xx-small" )
-            setAttribute<FontSize>(StyleAttributeType::FontSize, FontSize{FontSizeType::XXSmall}) ;
-        else if ( val == "x-small" )
-            setAttribute<FontSize>(StyleAttributeType::FontSize, FontSize{FontSizeType::XSmall}) ;
-        else if ( val == "small" )
-            setAttribute<FontSize>(StyleAttributeType::FontSize, FontSize{FontSizeType::Small}) ;
-        else if ( val == "medium" )
-            setAttribute<FontSize>(StyleAttributeType::FontSize, FontSize{FontSizeType::Medium}) ;
-        else if ( val == "large" )
-            setAttribute<FontSize>(StyleAttributeType::FontSize, FontSize{FontSizeType::Large}) ;
-        else if ( val == "x-large" )
-            setAttribute<FontSize>(StyleAttributeType::FontSize, FontSize{FontSizeType::XLarge}) ;
-        else if ( val == "xx-large" )
-            setAttribute<FontSize>(StyleAttributeType::FontSize, FontSize{FontSizeType::XXLarge}) ;
-        else {
-            setAttribute<FontSize>(StyleAttributeType::FontSize, FontSize{Length::fromString(val)}) ;
-        }
+        parseAttribute(name, val, font_size_) ;
     }
     else if ( name == "text-decoration" ) {
         if ( val == "underline" )
-            setAttribute<TextDecoration>(StyleAttributeType::TextDecoration, TextDecoration::Underline) ;
+            setTextDecoration(TextDecoration::Underline) ;
         else if ( val == "overline" )
-            setAttribute<TextDecoration>(StyleAttributeType::TextDecoration, TextDecoration::Overline) ;
+            setTextDecoration(TextDecoration::Overline) ;
         else if ( val == "strike" )
-            setAttribute<TextDecoration>(StyleAttributeType::TextDecoration, TextDecoration::Strike) ;
+            setTextDecoration(TextDecoration::Strike) ;
         else if ( val == "line-through" )
-            setAttribute<TextDecoration>(StyleAttributeType::TextDecoration, TextDecoration::Overline) ;
+            setTextDecoration(TextDecoration::Overline) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "text-anchor" ) {
         if ( val == "start" )
-            setAttribute<TextAnchor>(StyleAttributeType::TextAnchor, TextAnchor::Start) ;
+            setTextAnchor(TextAnchor::Start) ;
         else if ( val == "middle" )
-            setAttribute<TextAnchor>(StyleAttributeType::TextAnchor, TextAnchor::Middle) ;
+            setTextAnchor(TextAnchor::Middle) ;
         else if ( val == "end" )
-            setAttribute<TextAnchor>(StyleAttributeType::TextAnchor, TextAnchor::End) ;
+            setTextAnchor(TextAnchor::End) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "display" ) {
         if ( val == "none" )
-            setAttribute<DisplayMode>(StyleAttributeType::Display, DisplayMode::None) ;
+            setDisplay(DisplayMode::None) ;
         else if ( val == "inline" )
-            setAttribute<DisplayMode>(StyleAttributeType::Display, DisplayMode::Inline) ;
+            setDisplay(DisplayMode::Inline) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "visibility" ) {
-        if ( val == "none" )
-            setAttribute<VisibilityMode>(StyleAttributeType::Visibility, VisibilityMode::None) ;
+        if ( val == "visible" )
+            setVisibility(VisibilityMode::Visible) ;
         else if ( val == "hidden" ||  val == "collapsed" )
-            setAttribute<VisibilityMode>(StyleAttributeType::Visibility, VisibilityMode::Hidden) ;
+            setVisibility(VisibilityMode::Hidden) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "shape-rendering" ) {
         if ( val == "auto" || val == "default" )
-            setAttribute<ShapeQuality>(StyleAttributeType::ShapeRendering, ShapeQuality::Auto) ;
+            setShapeQuality(ShapeQuality::Auto) ;
         else if ( val == "optimizeSpeed" )
-            setAttribute<ShapeQuality>(StyleAttributeType::ShapeRendering, ShapeQuality::OptimizeSpeed) ;
+            setShapeQuality(ShapeQuality::OptimizeSpeed) ;
         else if ( val == "crispEdges" )
-            setAttribute<ShapeQuality>(StyleAttributeType::ShapeRendering, ShapeQuality::CrispEdges) ;
+            setShapeQuality(ShapeQuality::CrispEdges) ;
         else if ( val == "geometricPrecision" )
-            setAttribute<ShapeQuality>(StyleAttributeType::ShapeRendering, ShapeQuality::GeometricPrecision) ;
+            setShapeQuality(ShapeQuality::GeometricPrecision) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "text-rendering" )  {
         if ( val == "auto" || val == "default" )
-            setAttribute<TextQuality>(StyleAttributeType::TextRendering, TextQuality::Auto) ;
+            setTextQuality(TextQuality::Auto) ;
         else if ( val == "optimizeSpeed" )
-            setAttribute<TextQuality>(StyleAttributeType::TextRendering, TextQuality::OptimizeSpeed) ;
+            setTextQuality(TextQuality::OptimizeSpeed) ;
         else if ( val == "optimizeLegibility" )
-            setAttribute<TextQuality>(StyleAttributeType::TextRendering, TextQuality::OptimizeLegibility) ;
+            setTextQuality(TextQuality::OptimizeLegibility) ;
         else if ( val == "geometricPrecision" )
-            setAttribute<TextQuality>(StyleAttributeType::TextRendering, TextQuality::GeometricPrecision) ;
+            setTextQuality(TextQuality::GeometricPrecision) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
-    else if ( name == "stop-opacity" )
-    {
+    else if ( name == "stop-opacity" ) {
         float v ;
-        if ( parse_number(val, v) )
-            setAttribute<float>(StyleAttributeType::StopOpacity, v) ;
-
+        if ( parseOpacity(val, v) )
+            setStopOpacity(v) ;
+        else
+            throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "stop-color" ) {
-        try {
-            CSSColor clr(val) ;
-            setAttribute<CSSColor>(StyleAttributeType::StopColor, clr) ;
-        }
-        catch ( CSSColorParseException & ) {
-            throw SVGDOMAttributeValueException("invalid color string for \"stop-color\"") ;
-        }
+        parseAttribute(name, val, stop_color_) ;
     }
     else if ( name == "overflow" ) {
         if ( val == "visible" )
-            setAttribute<OverflowType>(StyleAttributeType::Overflow, OverflowType::Visible) ;
+            setOverflow(OverflowType::Visible) ;
         else if ( val == "auto" )
-            setAttribute<OverflowType>(StyleAttributeType::Overflow, OverflowType::Auto) ;
+            setOverflow(OverflowType::Auto) ;
         if ( val == "hidden" )
-            setAttribute<OverflowType>(StyleAttributeType::Overflow, OverflowType::Hidden) ;
+            setOverflow(OverflowType::Hidden) ;
         else if ( val == "scroll" )
-            setAttribute<OverflowType>(StyleAttributeType::Overflow, OverflowType::Scroll) ;
+            setOverflow(OverflowType::Scroll) ;
+        else throw SVGDOMAttributeValueException(name, val) ;
     }
     else if ( name == "clip-path" ) {
-        string id = parse_uri(val) ;
-
-        if ( !id.empty() )
-            setAttribute<string>(StyleAttributeType::ClipPath, id) ;
-        else
-            throw SVGDOMAttributeValueException("invalid url for \"clip-path\"") ;
+        parseAttribute(name, val, clip_path_) ;
     }
-
-
 
 }
 
-void Style::fromStyleString(const string &str, Element *c) {
+void Style::fromStyleString(const string &str) {
     static regex sr("([a-zA-Z-]+)[\\s]*:[\\s]*([^:;]+)[\\s]*[;]?") ;
 
     sregex_iterator it(str.begin(), str.end(), sr), end ;
 
     while ( it != end )  {
-        parseNameValue(it->str(1), it->str(2), c) ;
+        parseNameValue(it->str(1), it->str(2)) ;
         ++it ;
     }
 }
 
+#define SVG_STYLE_ATTRIBUTE_INHERIT(a) if ( other.a ) a = other.a
 
+void Style::extend(const Style &other) {
+
+    SVG_STYLE_ATTRIBUTE_INHERIT(fill_rule_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(clip_rule_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(clip_path_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(shape_quality_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(stroke_width_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(dash_offset_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(font_size_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(miter_limit_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(line_cap_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(line_join_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(dash_array_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(fill_paint_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(stroke_paint_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(fill_opacity_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(stroke_opacity_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(opacity_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(stop_color_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(stop_opacity_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(overflow_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(font_family_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(font_style_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(font_weight_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(font_variant_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(font_stretch_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(text_decoration_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(text_anchor_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(display_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(visibility_) ;
+    SVG_STYLE_ATTRIBUTE_INHERIT(text_quality_) ;
+}
+
+bool FontSize::parse(const string &val) {
+    if ( val == "xx-small" )
+        type_ = FontSizeType::XXSmall ;
+    else if ( val == "x-small" )
+        type_ = FontSizeType::XSmall ;
+    else if ( val == "small" )
+        type_ = FontSizeType::Small ;
+    else if ( val == "medium" )
+        type_ = FontSizeType::Medium ;
+    else if ( val == "large" )
+        type_ = FontSizeType::Large ;
+    else if ( val == "x-large" )
+        type_ = FontSizeType::XLarge ;
+    else if ( val == "xx-large" )
+        type_ = FontSizeType::XXLarge ;
+    else {
+        type_ = FontSizeType::Length ;
+        return val_.parse(val) ;
+    }
+
+    return true ;
+}
+
+template<>
+void Style::parseAttribute(const std::string &name, const std::string &val, std::shared_ptr<CSSColor> &a) {
+
+    try {
+        CSSColor clr(val) ;
+        a.reset(new CSSColor(clr)) ;
+    }
+    catch ( CSSColorParseException & ) {
+        throw SVGDOMAttributeValueException(name, val) ;
+    }
+
+}
 
 
 } // namespace svg

@@ -7,9 +7,11 @@
 namespace xg {
 namespace svg {
 
-class SVGDOMAttributeValueException: public std::runtime_error {
+class SVGDOMAttributeValueException {
 public:
-    SVGDOMAttributeValueException(const std::string &msg = std::string()): std::runtime_error(msg) {}
+    SVGDOMAttributeValueException(const std::string &name, const std::string &val,
+                                  const std::string &msg = std::string()): name_(name), val_(val), msg_(msg) {}
+    std::string name_, val_, msg_ ;
 } ;
 
 class SVGDOMException: public std::runtime_error {

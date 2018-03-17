@@ -28,7 +28,7 @@ protected:
         if ( is_root )
             root_ = dynamic_cast<svg::SVGElement *>(node.get()) ;
 
-        node->setRoot(root_) ;
+        node->setDocument(&document_) ;
 
         auto ele = std::dynamic_pointer_cast<svg::Element>(node) ;
 

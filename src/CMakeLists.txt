@@ -40,6 +40,7 @@ SET ( XG_FILES
     ${SRC_ROOT}/svg/svg_length.hpp
     ${SRC_ROOT}/svg/svg_style.cpp
     ${SRC_ROOT}/svg/svg_style.hpp
+    ${SRC_ROOT}/svg/svg_style_attributes.hpp
     ${SRC_ROOT}/svg/svg_parse_util.cpp
     ${SRC_ROOT}/svg/svg_parse_util.hpp
     ${SRC_ROOT}/svg/svg_render_context.cpp
