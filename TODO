@@ -5,8 +5,12 @@
 -- Paths boolean (e.g. using clipper)
 -- Masks and Filters
 -- Glyph and text rendering
+-- external references
+-- external styles
+-- Style element
 
 Failed samples:
-https://github.com/jgraph/draw-batik/blob/master/samples/gradients.svg
+
 https://github.com/jgraph/draw-batik/blob/master/samples/henryV.svg
 https://github.com/jgraph/draw-batik/blob/master/samples/textRotate.svg
+

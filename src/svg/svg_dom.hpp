@@ -195,7 +195,7 @@ public:
 
     SVG_ELEMENT_ATTRIBUTE(x1_, x1, Length, 0.0_perc)
     SVG_ELEMENT_ATTRIBUTE(y1_, y1, Length, 0.0_perc)
-    SVG_ELEMENT_ATTRIBUTE(x2_, x2, Length, 1.0_perc)
+    SVG_ELEMENT_ATTRIBUTE(x2_, x2, Length, 100.0_perc)
     SVG_ELEMENT_ATTRIBUTE(y2_, y2, Length, 0.0_perc)
 
 } ;
@@ -213,11 +213,11 @@ public:
     Length fy_inherited() ;
     Length r_inherited() ;
 
-    SVG_ELEMENT_ATTRIBUTE(cx_, cx, Length, 0.5_perc)
-    SVG_ELEMENT_ATTRIBUTE(cy_, cy, Length, 0.5_perc)
+    SVG_ELEMENT_ATTRIBUTE(cx_, cx, Length, 50._perc)
+    SVG_ELEMENT_ATTRIBUTE(cy_, cy, Length, 50._perc)
     SVG_ELEMENT_ATTRIBUTE(fx_, fx, Length, 0)
     SVG_ELEMENT_ATTRIBUTE(fy_, fy, Length, 0)
-    SVG_ELEMENT_ATTRIBUTE(r_, r, Length, 0.5_perc)
+    SVG_ELEMENT_ATTRIBUTE(r_, r, Length, 50._perc)
 
 } ;
 
@@ -470,8 +470,8 @@ public:
 
     SVG_ELEMENT_ATTRIBUTE(x_, x, Length, 0.0)
     SVG_ELEMENT_ATTRIBUTE(y_, y, Length, 0.0)
-    SVG_ELEMENT_ATTRIBUTE(width_, width, Length, 1.0_perc)
-    SVG_ELEMENT_ATTRIBUTE(height_, height, Length, 1.0_perc)
+    SVG_ELEMENT_ATTRIBUTE(width_, width, Length, 100.0_perc)
+    SVG_ELEMENT_ATTRIBUTE(height_, height, Length, 100.0_perc)
 } ;
 
 class SymbolElement:  public GroupContainer, public Stylable, public FitToViewBox {
@@ -484,8 +484,8 @@ public:
 
     SVG_ELEMENT_ATTRIBUTE(x_, x, Length, 0.0)
     SVG_ELEMENT_ATTRIBUTE(y_, y, Length, 0.0)
-    SVG_ELEMENT_ATTRIBUTE(width_, width, Length, 1.0_perc)
-    SVG_ELEMENT_ATTRIBUTE(height_, height, Length, 1.0_perc)
+    SVG_ELEMENT_ATTRIBUTE(width_, width, Length, 100.0_perc)
+    SVG_ELEMENT_ATTRIBUTE(height_, height, Length, 100.0_perc)
 
 } ;
 

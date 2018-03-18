@@ -157,7 +157,7 @@ void RenderingContext::preRenderShape(Element &e, const Style &s, const Matrix2d
     canvas_.save() ;
     canvas_.setTransform(t) ;
 
-//    setOverflow(s, bounds) ;
+    //    setOverflow(s, bounds) ;
     clip(e, s) ;
 
     obbox_ = bounds ;
@@ -484,9 +484,9 @@ void RenderingContext::applyClipPath(ClipPathElement *cp)
     xg::FillRule fr ;
 
     if ( cp->style().getFillRule() == FillRule::EvenOdd )
-      fr = xg::FillRule::EvenOdd ;
+        fr = xg::FillRule::EvenOdd ;
     else
-      fr = xg::FillRule::NonZero ;
+        fr = xg::FillRule::NonZero ;
 
     canvas_.setClipPath(clipCtx.clip_path_, fr) ;
 }
@@ -634,42 +634,42 @@ void RenderingContext::render(ImageElement &e) {
 
     if ( e.uri().empty() ) return ;
 
-     pushState(e.style()) ;
-     pushTransform(e.trans()) ;
+    pushState(e.style()) ;
+    pushTransform(e.trans()) ;
 
-     canvas_.save() ;
-     canvas_.setTransform(e.trans());
+    canvas_.save() ;
+    canvas_.setTransform(e.trans());
 
-     Style &st = states_.back() ;
+    Style &st = states_.back() ;
 
-     float ix = toPixels(e.x(), LengthDirection::Horizontal) ;
-     float iy = toPixels(e.y(), LengthDirection::Vertical) ;
-     float iw = toPixels(e.width(), LengthDirection::Horizontal) ;
-     float ih = toPixels(e.height(), LengthDirection::Vertical) ;
+    float ix = toPixels(e.x(), LengthDirection::Horizontal) ;
+    float iy = toPixels(e.y(), LengthDirection::Vertical) ;
+    float iw = toPixels(e.width(), LengthDirection::Horizontal) ;
+    float ih = toPixels(e.height(), LengthDirection::Vertical) ;
 
-     if ( iw == 0.0 || ih == 0 ) return ;
+    if ( iw == 0.0 || ih == 0 ) return ;
 
-     float opc = st.getOpacity() ;
+    float opc = st.getOpacity() ;
 
-     Image im = e.document().loadImageResource(e.uri(), &e);
-     if ( !im.pixels() ) return ;
+    Image im = e.document().loadImageResource(e.uri(), &e);
+    if ( !im.pixels() ) return ;
 
-     double width = im.width() ;
-     double height = im.height() ;
+    double width = im.width() ;
+    double height = im.height() ;
 
-     Matrix2d trs = e.preserveAspectRatio().getViewBoxTransform(iw, ih, width, height, 0, 0 ) ;
+    Matrix2d trs = e.preserveAspectRatio().getViewBoxTransform(iw, ih, width, height, 0, 0 ) ;
 
-     trs.translate(ix, iy) ;
+    trs.translate(ix, iy) ;
 
-     canvas_.save() ;
-     canvas_.setTransform(trs) ;
-     canvas_.drawImage(im, opc) ;
-     canvas_.restore() ;
+    canvas_.save() ;
+    canvas_.setTransform(trs) ;
+    canvas_.drawImage(im, opc) ;
+    canvas_.restore() ;
 
-     canvas_.restore() ;
+    canvas_.restore() ;
 
-     popTransform() ;
-     popState() ;
+    popTransform() ;
+    popState() ;
 
 }
 
@@ -724,35 +724,35 @@ Font RenderingContext::makeFont(const Style &st)
 
     switch ( f_style )
     {
-        case FontStyle::Oblique:
-            f.setStyle(xg::FontStyle::Oblique) ;
-            break ;
-        case FontStyle::Italic:
-            f.setStyle(xg::FontStyle::Italic) ;
-            break ;
-        case FontStyle::Normal:
-            f.setStyle(xg::FontStyle::Normal) ;
-            break ;
+    case FontStyle::Oblique:
+        f.setStyle(xg::FontStyle::Oblique) ;
+        break ;
+    case FontStyle::Italic:
+        f.setStyle(xg::FontStyle::Italic) ;
+        break ;
+    case FontStyle::Normal:
+        f.setStyle(xg::FontStyle::Normal) ;
+        break ;
     }
 
     switch ( f_weight )
     {
-        case FontWeight::Normal:
-        case FontWeight::W100:
-        case FontWeight::W200:
-        case FontWeight::W300:
-        case FontWeight::W400:
-            f.setWeight(xg::FontWeight::Normal) ;
-            break ;
-        case FontWeight::Bold:
-        case FontWeight::Bolder:
-        case FontWeight::W500:
-        case FontWeight::W600:
-        case FontWeight::W700:
-        case FontWeight::W800:
-        case FontWeight::W900:
-            f.setWeight(xg::FontWeight::Bold) ;
-            break ;
+    case FontWeight::Normal:
+    case FontWeight::W100:
+    case FontWeight::W200:
+    case FontWeight::W300:
+    case FontWeight::W400:
+        f.setWeight(xg::FontWeight::Normal) ;
+        break ;
+    case FontWeight::Bold:
+    case FontWeight::Bolder:
+    case FontWeight::W500:
+    case FontWeight::W600:
+    case FontWeight::W700:
+    case FontWeight::W800:
+    case FontWeight::W900:
+        f.setWeight(xg::FontWeight::Bold) ;
+        break ;
     }
 
     return f ;
@@ -816,14 +816,16 @@ void RenderingContext::render(TSpanElement &e)
     TextLayout tl(e.text_ + ' ', f) ;
     tl.compute() ;
 
-    /*
-    if ( st.textAnchor == Style::MiddleTextAnchor )
-           xpt -= extents.width/2 ;
-       else if ( st.textAnchor == Style::EndTextAnchor )
-           xpt -= extents.width ;
-   */
-
     const auto &line = tl.lines()[0] ;
+
+
+    double ofx = 0, ofy = 0 ;
+
+    if ( st.getTextAnchor() == TextAnchor::Middle )
+        ofx = -line.width()/2 ;
+    else if ( st.getTextAnchor() == TextAnchor::End )
+        ofx = -line.width() ;
+
 
     vector<Point2d> gpos ;
 
@@ -840,7 +842,7 @@ void RenderingContext::render(TSpanElement &e)
 
     if ( rendering_mode_ == RenderingMode::Display ) {
         canvas_.save() ;
-        canvas_.setTransform(Matrix2d::translation(x + dx, y + dy)) ;
+        canvas_.setTransform(Matrix2d::translation(x + dx + ofx, y + dy + ofy)) ;
         canvas_.setFont(f) ;
 
         setPaint(e) ;
@@ -974,9 +976,9 @@ void RenderingContext::render(SymbolElement &e, double pw, double ph)
 }
 
 void RenderingContext::render(GroupElement &g) {
-     preRenderShape(g, g.style(), g.trans(), Rectangle2d()) ;
-     renderChildren(g) ;
-     postRenderShape() ;
+    preRenderShape(g, g.style(), g.trans(), Rectangle2d()) ;
+    renderChildren(g) ;
+    postRenderShape() ;
 }
 
 void RenderingContext::render(UseElement &e)

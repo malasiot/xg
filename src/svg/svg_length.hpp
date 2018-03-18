@@ -15,7 +15,9 @@ class Length
   public:
 
     Length(): unit_type_(LengthUnitType::Unknown), value_in_specified_units_(0) {}
-    Length(float val, LengthUnitType unit = LengthUnitType::Number): unit_type_(unit), value_in_specified_units_(val) {}
+    Length(float val, LengthUnitType unit = LengthUnitType::Number): unit_type_(unit), value_in_specified_units_(val) {
+        if ( unit_type_ == LengthUnitType::Percentage ) value_in_specified_units_ /= 100.0 ;
+    }
 
     bool parse(const std::string &str)  ;
 

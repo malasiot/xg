@@ -234,8 +234,7 @@ void Element::parseTransformAttribute(const Dictionary &attrs, OptionalAttribute
      \
         p = document().resolve(q->href_.value().uri()) ;\
     }\
-    \
-    return attrName.value() ;\
+
 
 void GradientElement::parseAttributes(const Dictionary &attrs)
 {
@@ -273,15 +272,18 @@ void GradientElement::parseAttributes(const Dictionary &attrs)
 
 GradientSpreadMethod GradientElement::spreadMethodInherited() {
     SVG_INHERIT_ATTRIBUTE(GradientElement, spread_method_, GradientSpreadMethod) ;
+    return spreadMethod() ;
 }
 
 GradientUnits GradientElement::gradientUnitsInherited() {
     SVG_INHERIT_ATTRIBUTE(GradientElement, gradient_units_, GradientUnits) ;
+    return gradientUnits() ;
 }
 
 
 Matrix2d GradientElement::gradientTransformInherited() {
     SVG_INHERIT_ATTRIBUTE(GradientElement, trans_, Matrix2d) ;
+    return gradientTransform();
 }
 
 void GradientElement::collectStops(std::vector<StopElement *> &stops)
@@ -324,19 +326,23 @@ void LinearGradientElement::parseAttributes(const Dictionary &attrs)
 
 
 Length LinearGradientElement::x1_inherited() {
-    SVG_INHERIT_ATTRIBUTE(LinearGradientElement,  x1_, Length)
+    SVG_INHERIT_ATTRIBUTE(LinearGradientElement,  x1_, Length);
+    return x1() ;
 }
 
 Length LinearGradientElement::y1_inherited() {
-    SVG_INHERIT_ATTRIBUTE(LinearGradientElement,  y1_, Length)
+    SVG_INHERIT_ATTRIBUTE(LinearGradientElement,  y1_, Length);
+    return y1();
 }
 
 Length LinearGradientElement::x2_inherited() {
-    SVG_INHERIT_ATTRIBUTE(LinearGradientElement,  x2_, Length)
+    SVG_INHERIT_ATTRIBUTE(LinearGradientElement,  x2_, Length);
+    return x2() ;
 }
 
 Length LinearGradientElement::y2_inherited() {
-    SVG_INHERIT_ATTRIBUTE(LinearGradientElement,  y2_, Length)
+    SVG_INHERIT_ATTRIBUTE(LinearGradientElement,  y2_, Length);
+    return y2() ;
 }
 
 void RadialGradientElement::parseAttributes(const Dictionary &attrs)
@@ -354,23 +360,28 @@ void RadialGradientElement::parseAttributes(const Dictionary &attrs)
 }
 
 Length RadialGradientElement::cx_inherited() {
-    SVG_INHERIT_ATTRIBUTE(RadialGradientElement,  cx_, Length)
+    SVG_INHERIT_ATTRIBUTE(RadialGradientElement,  cx_, Length);
+    return cx() ;
 }
 
 Length RadialGradientElement::cy_inherited() {
-    SVG_INHERIT_ATTRIBUTE(RadialGradientElement,  cy_, Length)
+    SVG_INHERIT_ATTRIBUTE(RadialGradientElement,  cy_, Length);
+    return cy() ;
 }
 
 Length RadialGradientElement::fx_inherited() {
-    SVG_INHERIT_ATTRIBUTE(RadialGradientElement,  fx_, Length)
+    SVG_INHERIT_ATTRIBUTE(RadialGradientElement,  fx_, Length);
+    return fx() ;
 }
 
 Length RadialGradientElement::fy_inherited() {
-    SVG_INHERIT_ATTRIBUTE(RadialGradientElement,  fy_, Length)
+    SVG_INHERIT_ATTRIBUTE(RadialGradientElement,  fy_, Length);
+    return fy() ;
 }
 
 Length RadialGradientElement::r_inherited() {
-    SVG_INHERIT_ATTRIBUTE(RadialGradientElement, r_, Length)
+    SVG_INHERIT_ATTRIBUTE(RadialGradientElement, r_, Length);
+    return r() ;
 }
 
 void PatternElement::collectChildren(std::vector<Element *> &child_list)
@@ -493,7 +504,7 @@ void StopElement::parseAttributes(const Dictionary &attrs) {
         if ( l.units() == LengthUnitType::Number )
             perc = l.value() ;
         else if ( l.units() == LengthUnitType::Percentage )
-            perc = l.value() / 100.0 ;
+            perc = l.value()  ;
         else
             throw SVGDOMAttributeValueException(key, val) ;
 

@@ -99,6 +99,9 @@ bool Length::parse(const std::string &str)  {
 
     if ( ! parse_units(c_end, unit_type_) ) return false ;
 
+    if ( unit_type_ == LengthUnitType::Percentage )
+        value_in_specified_units_ /= 100.0 ;
+
     return true ;
 }
 
@@ -119,6 +122,9 @@ bool LengthList::parse(const string &str)
         LengthUnitType unit_type = LengthUnitType::Number ;
 
         if ( ! parse_units(c_end, unit_type) )  return false ;
+
+        if ( unit_type == LengthUnitType::Percentage )
+            value /= 100.0 ;
 
         values_.emplace_back(value, unit_type) ;
 
