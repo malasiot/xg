@@ -87,7 +87,6 @@ bool PreserveAspectRatio::parse(const string &str) {
         return false ;
 
     return true ;
-
 }
 
 void PreserveAspectRatio::constrainViewBox(double width, double height, ViewBox &orig) const

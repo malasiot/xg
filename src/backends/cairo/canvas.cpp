@@ -573,6 +573,11 @@ static void cairo_push_transform(cairo_t *cr, const Matrix2d &a)
     cairo_transform (cr, &matrix);
 }
 
+void Canvas::setClipRect(const Rectangle2d &r)
+{
+    setClipRect(r.x(), r.y(), r.width(), r.height()) ;
+}
+
 void Canvas::setClipRect(double x0, double y0, double w, double h)
 {
     cairo_rectangle(cr_, x0, y0, w, h) ;

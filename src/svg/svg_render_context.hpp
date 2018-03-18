@@ -74,6 +74,8 @@ public:
       void setPatternBrush(PatternElement &e, float a) ;
       Font makeFont(const Style &st);
 
+      void setOverflow(const Style &st, const Rectangle2d &r);
+
 protected:
 
       Canvas &canvas_ ;

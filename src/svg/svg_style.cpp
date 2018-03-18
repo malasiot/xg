@@ -264,7 +264,7 @@ void Style::parseNameValue(const string &name, const string &value) {
             setOverflow(OverflowType::Visible) ;
         else if ( val == "auto" )
             setOverflow(OverflowType::Auto) ;
-        if ( val == "hidden" )
+        else if ( val == "hidden" )
             setOverflow(OverflowType::Hidden) ;
         else if ( val == "scroll" )
             setOverflow(OverflowType::Scroll) ;

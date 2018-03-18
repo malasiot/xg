@@ -10,143 +10,10 @@
 #include "svg_length.hpp"
 #include "svg_dom_exceptions.hpp"
 #include "svg_style.hpp"
+#include "svg_dom_attributes.hpp"
 
 namespace xg {
 namespace svg {
-
-class ViewBox {
-public:
-
-    ViewBox() = default ;
-    ViewBox(float x, float y, float w, float h): x_(x), y_(y), width_(w), height_(h) {}
-
-    bool parse(const std::string &s) ;
-
-    float x_ = 0, y_ = 0, width_ = 0 , height_ = 0 ;
-} ;
-
-class PathData
-{
-public:
-
-    PathData() = default ;
-
-    bool parse(const std::string &str) ;
-
-    const Path &path() const { return path_ ; }
-
-protected:
-
-    Path path_ ;
-} ;
-
-
-class PointList {
-public:
-
-    bool parse(const std::string &str) ;
-
-    const std::vector<Point2d> &points() const { return points_ ; }
-
-protected:
-
-    std::vector<Point2d> points_ ;
-} ;
-
-class Transform {
-public:
-
-    Transform() = default ;
-
-    void parse(const std::string &str) ;
-
-    Matrix2d m_ ;
-} ;
-
-
-class PreserveAspectRatio
-{
-public:
-
-    enum ViewBoxAlign { NoViewBoxAlign, XMinYMin, XMidYMin, XMaxYMin, XMinYMid, XMidYMid, XMaxYMid,
-                        XMinYMax, XMidYMax, XMaxYMax } ;
-    enum ViewBoxPolicy { MeetViewBoxPolicy, SliceViewBoxPolicy } ;
-
-    PreserveAspectRatio(): view_box_align_(XMidYMid), view_box_policy_(MeetViewBoxPolicy), defer_aspect_ratio_(false) {}
-
-    bool parse(const std::string &str) ;
-    void constrainViewBox(double width, double height, ViewBox &orig) const;
-    Matrix2d getViewBoxTransform(double sw, double sh, double vwidth, double vheight, double vx, double vy) const;
-
-    bool defer_aspect_ratio_ ;
-    ViewBoxAlign view_box_align_ ;
-    ViewBoxPolicy view_box_policy_ ;
-} ;
-
-class URIReference {
-public:
-    URIReference() = default ;
-    URIReference(const std::string &val): uri_(val) {}
-
-    bool parse(const std::string &v) {
-        uri_ = v ;
-        return true ;
-    }
-
-    const std::string &uri() const { return uri_ ; }
-
-    std::string uri_ ;
-};
-
-template<typename S>
-class OptionalAttribute {
-public:
-
-    typedef S type ;
-
-    // set default value
-    OptionalAttribute() = default ;
-
-    OptionalAttribute(const OptionalAttribute<S> &) = delete ;
-    OptionalAttribute &operator = ( const OptionalAttribute<S> &) = delete ;
-
-    const S &value() const { return value_ ; }
-    void assign(const S &val) { value_ = val ; has_value_ = true ; }
-    bool hasValue() const { return has_value_ ;}
-
-    S value_ ;
-    bool has_value_ = false ;
-} ;
-
-#define SVG_ELEMENT_ATTRIBUTE(avar, aget, atype, adef)\
-protected:\
-    OptionalAttribute<atype> avar ;\
-public:\
-\
-    const atype &aget() const { \
-        static const atype avar_default_{adef} ;\
-        return ( avar.hasValue() ) ? avar.value() : avar_default_ ; }\
-    bool aget##IsSet() const { return avar.hasValue() ; }
-
-
-class Stylable {
-public:
-
-    SVG_ELEMENT_ATTRIBUTE(style_, style, Style, Style())
-} ;
-
-class Transformable {
-public:
-    SVG_ELEMENT_ATTRIBUTE(trans_, trans, Matrix2d, Matrix2d())
-} ;
-
-class FitToViewBox {
-public:
-
-    SVG_ELEMENT_ATTRIBUTE(view_box_, viewBox, ViewBox, ViewBox())
-    SVG_ELEMENT_ATTRIBUTE(preserve_aspect_ratio_, preserveAspectRatio, PreserveAspectRatio, PreserveAspectRatio())
-} ;
-
 
 class CircleElement ;
 class LineElement ;
@@ -172,9 +39,26 @@ class SVGElement ;
 class StyleElement ;
 class Element ;
 
-// base class of all SVG elements
-
 using ElementPtr = std::shared_ptr<Element> ;
+
+
+class Stylable {
+public:
+    SVG_ELEMENT_ATTRIBUTE(style_, style, Style, Style())
+} ;
+
+class Transformable {
+public:
+    SVG_ELEMENT_ATTRIBUTE(trans_, trans, Matrix2d, Matrix2d())
+} ;
+
+class FitToViewBox {
+public:
+
+    SVG_ELEMENT_ATTRIBUTE(view_box_, viewBox, ViewBox, ViewBox())
+    SVG_ELEMENT_ATTRIBUTE(preserve_aspect_ratio_, preserveAspectRatio, PreserveAspectRatio, PreserveAspectRatio())
+} ;
+
 
 enum class WhiteSpaceProcessing { Default, Preserve } ;
 
@@ -204,7 +88,6 @@ public:
 
     void setDocument(SVGDocument *doc) { root_ = doc ; }
 
-    // return most close SVGElement
     SVGDocument &document() { return *root_;}
 
     std::string id() const ;
@@ -212,7 +95,6 @@ public:
     WhiteSpaceProcessing space() const { return ws_ ; }
 
     const std::vector<ElementPtr> &children() const { return children_ ; }
-
 
 protected:
 
@@ -410,7 +292,6 @@ public:
     void parseAttributes(const Dictionary &a) ;
 
     SVG_ELEMENT_ATTRIBUTE(clip_path_units_, clipPathUnits, ClipPathUnits, ClipPathUnits::UserSpaceOnUse)
-
 } ;
 
 class UseElement: public GroupContainer, public Transformable, public Stylable
@@ -425,7 +306,6 @@ public:
     SVG_ELEMENT_ATTRIBUTE(y_, y, Length, 0)
     SVG_ELEMENT_ATTRIBUTE(width_, width, Length, 0)
     SVG_ELEMENT_ATTRIBUTE(height_, height, Length, 0)
-
 } ;
 
 
@@ -580,28 +460,6 @@ public:
 } ;
 
 
-template<typename T>
-inline void parseOptionalAttribute(const char *name, const Dictionary &attr, OptionalAttribute<T> &t) {
-
-    std::string value = attr.get(name) ;
-    try {
-        if ( !value.empty() ) {
-            T v ;
-            v.parse(value) ;
-            t.assign(v) ;
-        }
-    }
-    catch ( SVGDOMAttributeValueException &e ) {
-        std::string reason = e.msg_ ;
-        std::stringstream strm ;
-        strm << "invalid value \"" << value << "\" of attribute \"" << name << "\"" ;
-        if ( !reason.empty() ) strm << ": " << reason ;
-        throw SVGDOMException(strm.str()) ;
-    }
-}
-
-
-
 class SVGElement: public GroupContainer, public Stylable, public FitToViewBox {
 
 public:
@@ -610,23 +468,10 @@ public:
 
     void parseAttributes(const Dictionary &attrs) ;
 
-    void registerNamedElement(const std::string &id, Element *e) {
-        elements_.insert({"#" + id, e}) ;
-    }
-
-    Element *resolve(const std::string &uri) const ;
-    xg::Image loadImageResource(const std::string &uri, Element *container) ;
-
     SVG_ELEMENT_ATTRIBUTE(x_, x, Length, 0.0)
     SVG_ELEMENT_ATTRIBUTE(y_, y, Length, 0.0)
     SVG_ELEMENT_ATTRIBUTE(width_, width, Length, 1.0_perc)
     SVG_ELEMENT_ATTRIBUTE(height_, height, Length, 1.0_perc)
-
-    protected:
-
-        std::map<std::string, svg::Element *> elements_ ;
-    std::map<svg::Element *, Image> cached_images_ ;
-
 } ;
 
 class SymbolElement:  public GroupContainer, public Stylable, public FitToViewBox {

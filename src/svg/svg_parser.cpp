@@ -120,7 +120,9 @@ void SVGParser::endElement() {
 
 void SVGParser::characters(const string &text) {
     if ( auto p = std::dynamic_pointer_cast<svg::TextElement>(nodes_.back()) ) {
-        p->addChild(make_shared<svg::TSpanElement>(text)) ;
+        auto q = make_shared<svg::TSpanElement>(text) ;
+        q->setDocument(&document_) ;
+        p->addChild(q) ;
     }
     else if ( auto p = std::dynamic_pointer_cast<svg::TSpanElement>(nodes_.back()) ) {
         p->text_ = text ;

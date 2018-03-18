@@ -104,42 +104,6 @@ float RenderingContext::toPixels(const Length &l, LengthDirection dir, bool scal
     return 0 ;
 }
 
-void RenderingContext::render(SVGElement &e) {
-    pushState(e.style()) ;
-
-    float xx, yy, sw, sh ;
-
-    xx = toPixels(e.x(), LengthDirection::Horizontal) ;
-    yy = toPixels(e.y(), LengthDirection::Vertical) ;
-    sw = toPixels(e.width(), LengthDirection::Horizontal) ;
-    sh = toPixels(e.height(), LengthDirection::Vertical) ;
-
-    ViewBox vbox = e.viewBox() ;
-
-    if ( vbox.width_ == 0 ) vbox.width_ = sw ;
-    if ( vbox.height_ == 0 ) vbox.height_ = sh ;
-
-    view_boxes_.push_back(vbox) ;
-
-    Matrix2d trs = e.preserveAspectRatio().getViewBoxTransform(sw, sh, vbox.width_, vbox.height_, vbox.x_, vbox.y_) ;
-
-    view2dev_ = trs ;
-
-    canvas_.save() ;
-    canvas_.setTransform(trs) ;
-
-    OverflowType ov = e.style().getOverflow() ;
-
-    if ( ov == OverflowType::Scroll || ov == OverflowType::Hidden )
-        canvas_.setClipRect(xx, yy, sw, sh) ;
-
-    renderChildren(e);
-
-    canvas_.restore() ;
-
-    view_boxes_.pop_back();
-}
-
 
 void RenderingContext::pushState(const Style &st)
 {
@@ -148,8 +112,6 @@ void RenderingContext::pushState(const Style &st)
     else states_.push_back(states_.back()) ;
 
     Style &style = states_.back() ;
-
-    //style.resetNonInheritable()
 
     style.extend(st) ;
 }
@@ -195,6 +157,7 @@ void RenderingContext::preRenderShape(Element &e, const Style &s, const Matrix2d
     canvas_.save() ;
     canvas_.setTransform(t) ;
 
+//    setOverflow(s, bounds) ;
     clip(e, s) ;
 
     obbox_ = bounds ;
@@ -235,7 +198,6 @@ void RenderingContext::setLinearGradientBrush(LinearGradientElement &e, float a)
 
     ix2 = ( gu == GradientUnits::ObjectBoundingBox ) ?
                 x2.value() : toPixels(x2, LengthDirection::Horizontal) ;
-
 
 
     if ( gu == GradientUnits::ObjectBoundingBox ) {
@@ -1055,6 +1017,50 @@ void RenderingContext::render(UseElement &e)
 
 }
 
+void RenderingContext::setOverflow(const Style &st, const Rectangle2d &r) {
+    OverflowType ov = st.getOverflow() ;
+
+    if ( ov == OverflowType::Scroll || ov == OverflowType::Hidden )
+        canvas_.setClipRect(r) ;
+}
+
+
+void RenderingContext::render(SVGElement &e) {
+    pushState(e.style()) ;
+
+    float xx, yy, sw, sh ;
+
+    xx = toPixels(e.x(), LengthDirection::Horizontal) ;
+    yy = toPixels(e.y(), LengthDirection::Vertical) ;
+    sw = toPixels(e.width(), LengthDirection::Horizontal) ;
+    sh = toPixels(e.height(), LengthDirection::Vertical) ;
+
+    ViewBox vbox = e.viewBox() ;
+
+    if ( vbox.width_ == 0 ) vbox.width_ = sw ;
+    if ( vbox.height_ == 0 ) vbox.height_ = sh ;
+
+    view_boxes_.push_back(vbox) ;
+
+    Matrix2d trs = e.preserveAspectRatio().getViewBoxTransform(sw, sh, vbox.width_, vbox.height_, vbox.x_, vbox.y_) ;
+
+    Matrix2d trc = Matrix2d::translation(xx, yy) ;
+
+    trs.premult(trc) ;
+
+    view2dev_ = trs ;
+
+    canvas_.save() ;
+    canvas_.setTransform(trs) ;
+
+    setOverflow(e.style(), Rectangle2d(xx, yy, sw, sh)) ;
+
+    renderChildren(e);
+
+    canvas_.restore() ;
+
+    view_boxes_.pop_back();
+}
 
 
 
