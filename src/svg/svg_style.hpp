@@ -21,6 +21,9 @@ class Style
 {
 public:
 
+    Style(const Style &other);
+    Style() = default ;
+
     SVG_STYLE_ATTRIBUTE(FillRule, FillRule, fill_rule_, FillRule::NonZero)
     SVG_STYLE_ATTRIBUTE(ClipRule, ClipRule, clip_rule_, ClipRule::NonZero)
     SVG_STYLE_ATTRIBUTE(ClipPath, URI, clip_path_, URI())
@@ -39,7 +42,7 @@ public:
     SVG_STYLE_ATTRIBUTE(Opacity,  float, opacity_, 1.0)
     SVG_STYLE_ATTRIBUTE(StopColor,  CSSColor, stop_color_, NamedColor::black())
     SVG_STYLE_ATTRIBUTE(StopOpacity,  float, stop_opacity_, 1.0)
-    SVG_STYLE_ATTRIBUTE(Overflow,  OverflowType, overflow_, OverflowType::Visible)
+    SVG_STYLE_ATTRIBUTE(Overflow,  OverflowType, overflow_, OverflowType::Hidden)
     SVG_STYLE_ATTRIBUTE(FontFamily,  std::string, font_family_, "serif")
     SVG_STYLE_ATTRIBUTE(FontStyle,  FontStyle, font_style_, FontStyle::Normal)
     SVG_STYLE_ATTRIBUTE(FontWeight, FontWeight, font_weight_, FontWeight::Normal)
@@ -55,6 +58,7 @@ public:
     void fromStyleString(const std::string &str) ;
 
     void extend(const Style &other) ;
+
 
 private:
 

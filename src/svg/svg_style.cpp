@@ -287,10 +287,9 @@ void Style::fromStyleString(const string &str) {
     }
 }
 
-#define SVG_STYLE_ATTRIBUTE_INHERIT(a) if ( other.a ) a = other.a
+#define SVG_STYLE_ATTRIBUTE_INHERIT(a) a = other.a
 
-void Style::extend(const Style &other) {
-
+Style::Style(const Style &other) {
     SVG_STYLE_ATTRIBUTE_INHERIT(fill_rule_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(clip_rule_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(clip_path_) ;
@@ -306,10 +305,6 @@ void Style::extend(const Style &other) {
     SVG_STYLE_ATTRIBUTE_INHERIT(stroke_paint_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(fill_opacity_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(stroke_opacity_) ;
-    SVG_STYLE_ATTRIBUTE_INHERIT(opacity_) ;
-    SVG_STYLE_ATTRIBUTE_INHERIT(stop_color_) ;
-    SVG_STYLE_ATTRIBUTE_INHERIT(stop_opacity_) ;
-    SVG_STYLE_ATTRIBUTE_INHERIT(overflow_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(font_family_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(font_style_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(font_weight_) ;
@@ -317,9 +312,44 @@ void Style::extend(const Style &other) {
     SVG_STYLE_ATTRIBUTE_INHERIT(font_stretch_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(text_decoration_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(text_anchor_) ;
-    SVG_STYLE_ATTRIBUTE_INHERIT(display_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(visibility_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(text_quality_) ;
+
+}
+
+#define SVG_STYLE_ATTRIBUTE_COPY(a) if ( other.a ) a = other.a
+
+void Style::extend(const Style &other) {
+
+    SVG_STYLE_ATTRIBUTE_COPY(fill_rule_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(clip_rule_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(clip_path_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(shape_quality_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(stroke_width_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(dash_offset_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(font_size_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(miter_limit_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(line_cap_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(line_join_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(dash_array_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(fill_paint_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(stroke_paint_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(fill_opacity_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(stroke_opacity_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(opacity_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(stop_color_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(stop_opacity_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(overflow_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(font_family_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(font_style_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(font_weight_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(font_variant_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(font_stretch_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(text_decoration_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(text_anchor_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(display_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(visibility_) ;
+    SVG_STYLE_ATTRIBUTE_COPY(text_quality_) ;
 }
 
 bool FontSize::parse(const string &val) {

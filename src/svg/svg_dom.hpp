@@ -96,6 +96,8 @@ public:
 
     const std::vector<ElementPtr> &children() const { return children_ ; }
 
+    Element *parent() const { return parent_ ; }
+
 protected:
 
     std::string id_ ;

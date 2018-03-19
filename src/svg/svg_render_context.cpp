@@ -6,54 +6,6 @@ using namespace std ;
 namespace xg {
 namespace svg {
 
-/* Recursive evaluation of all parent elements regarding absolute font size */
-
-#if 0
-static double RenderingContext::normalizeFontSize (Element *e)
-{
-    Element *parent;
-
-    switch ( state->font_size.unit) {
-    case LENGTH_UNIT_PERCENT:
-    case LENGTH_UNIT_FONT_EM:
-    case LENGTH_UNIT_FONT_EX: {
-        double parent_size;
-
-        parent = rsvg_state_parent (state);
-        if (parent) {
-            parent_size = normalize_font_size (parent, ctx);
-        } else {
-            parent_size = 12.0;
-        }
-        return state->font_size.length * parent_size;
-    }
-
-    case LENGTH_UNIT_RELATIVE_LARGER:
-    case LENGTH_UNIT_RELATIVE_SMALLER: {
-        double parent_size;
-
-        parent = rsvg_state_parent (state);
-        if (parent) {
-            parent_size = normalize_font_size (parent, ctx);
-        } else {
-            parent_size = 12.0;
-        }
-
-        if (state->font_size.unit == LENGTH_UNIT_RELATIVE_LARGER) {
-            return parent_size * 1.2;
-        } else {
-            return parent_size / 1.2;
-        }
-    }
-
-    default:
-        return rsvg_length_normalize (&state->font_size, ctx);
-    }
-}
-
-#endif
-
-
 float RenderingContext::toPixels(const Length &l, LengthDirection dir, bool scale_to_viewport) {
     double factor = 1.0 ;
 
@@ -157,7 +109,6 @@ void RenderingContext::preRenderShape(Element &e, const Style &s, const Matrix2d
     canvas_.save() ;
     canvas_.setTransform(t) ;
 
-    //    setOverflow(s, bounds) ;
     clip(e, s) ;
 
     obbox_ = bounds ;
@@ -1052,10 +1003,10 @@ void RenderingContext::render(SVGElement &e) {
 
     view2dev_ = trs ;
 
+    setOverflow(e.style(), Rectangle2d(xx, yy, sw, sh)) ;
+
     canvas_.save() ;
     canvas_.setTransform(trs) ;
-
-    setOverflow(e.style(), Rectangle2d(xx, yy, sw, sh)) ;
 
     renderChildren(e);
 
