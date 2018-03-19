@@ -172,10 +172,17 @@ void Backend::fill_stroke_shape() {
 
     const State &state = state_.top();
 
+
+
     if ( state.brush_ )  {
         const auto &br = state.brush_ ;
 
         set_cairo_fill(br) ;
+
+        if ( state.mask_ ) {
+            cairo_mask_surface(cr_, state.mask_->surf_, 0, 0) ;
+        }
+
 
         if ( state.pen_  ) cairo_fill_preserve(cr_) ;
         else cairo_fill (cr_);
@@ -186,6 +193,8 @@ void Backend::fill_stroke_shape() {
         set_cairo_stroke(pen) ;
         cairo_stroke(cr_) ;
     }
+
+
 
 }
 
@@ -596,6 +605,11 @@ void Canvas::setClipPath(const Path &p, FillRule rule)
     cairo_clip(cr_) ;
 }
 
+void Canvas::setMask(std::shared_ptr<Canvas> mask)
+{
+     state_.top().mask_ = mask ;
+}
+
 void Canvas::drawLine(double x0, double y0, double x1, double y1) {
     line_path(x0, y0, x1, y1) ;
     fill_stroke_shape() ;
@@ -711,6 +725,8 @@ ImageCanvas::ImageCanvas(double w, double h, double dpi): Canvas(w, h, dpi, dpi)
 
 Image ImageCanvas::getImage()
 {
+    cairo_surface_flush(surf_) ;
+
     char *src = (char *)cairo_image_surface_get_data(surf_) ;
     unsigned width = cairo_image_surface_get_width(surf_) ;
     unsigned height = cairo_image_surface_get_height(surf_) ;

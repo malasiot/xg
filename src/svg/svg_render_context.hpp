@@ -18,6 +18,7 @@ public:
           dpi_x_ = canvas_.dpiX() ;
           dpi_y_ = canvas_.dpiY() ;
           font_sizes_.push_back(12) ;
+          opacity_.push_back(1.0) ;
       }
 
       void pushState(const Style &) ;
@@ -94,6 +95,7 @@ protected:
       float doc_width_hint_, doc_height_hint_ ;
       float dpi_x_ = 92, dpi_y_ = 92 ;
       Path clip_path_ ;
+      std::deque<double> opacity_ ;
 
 
 };

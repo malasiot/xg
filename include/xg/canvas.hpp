@@ -54,6 +54,7 @@ public:
     void setClipRect(const Rectangle2d &r) ;
 
     void setClipPath(const Path &p, FillRule frule= FillRule::EvenOdd) ;
+    void setMask(std::shared_ptr<Canvas> mask) ;
 
     void drawLine(double x0, double y0, double x1, double y1) ;
     void drawLine(const Point2d &p1, const Point2d &p2) ;
@@ -77,6 +78,7 @@ public:
     void drawGlyphs(const std::vector<Glyph> &glyphs, const std::vector<Point2d> &positions) ;
 
     void drawImage(const Image &im,  double opacity) ;
+
 
     void drawSVG(const SVGDocument &doc) ;
 

@@ -96,6 +96,7 @@ void RenderingContext::clip(Element &c, const Style &st) {
         if ( p ) {
             auto e = dynamic_cast<ClipPathElement *>(p) ;
             if ( e ) applyClipPath(e) ;
+            ;
         }
     }
 
@@ -109,9 +110,9 @@ void RenderingContext::preRenderShape(Element &e, const Style &s, const Matrix2d
     canvas_.save() ;
     canvas_.setTransform(t) ;
 
-    clip(e, s) ;
-
     obbox_ = bounds ;
+
+    clip(e, s) ;
 }
 
 void RenderingContext::setShapeAntialias (ShapeQuality aa) {
@@ -308,13 +309,6 @@ void RenderingContext::setPaint(Element &e)
 
     setShapeAntialias(st.getShapeQuality()) ;
 
-    /*
-      double x1, y1, x2, y2 ;
-      cairo_path_extents(cr, &x1, &y1, &x2, &y2) ;
-
-      ctx->extentBoundingBox(x1, y1, x2, y2) ;
-*/
-
     Paint stroke_paint = st.getStrokePaint() ;
 
     if ( stroke_paint.type() == PaintType::None ) ;
@@ -361,9 +355,10 @@ void RenderingContext::setPaint(Element &e)
         }
 
         float stroke_opacity = st.getStrokeOpacity() ;
-        float opacity = st.getOpacity() ;
+        float opacity = st.getOpacity() * opacity_.back();
         const CSSColor &css_clr = stroke_paint.color() ;
-        Color clr(css_clr, stroke_opacity * opacity) ;
+        Color clr(css_clr, stroke_opacity) ;
+
         pen.setColor(clr) ;
 
         canvas_.setPen(pen) ;
@@ -374,9 +369,10 @@ void RenderingContext::setPaint(Element &e)
     if ( fill_paint.type() == PaintType::None ) ;
     else if ( fill_paint.type() == PaintType::SolidColor ) {
         float fill_opacity = st.getFillOpacity() ;
-        float opacity = st.getOpacity() ;
+        float opacity = st.getOpacity() * opacity_.back() ;
         const CSSColor &css_clr = fill_paint.color() ;
-        Color clr(css_clr, fill_opacity * opacity) ;
+        Color clr(css_clr, fill_opacity) ;
+
 
         FillRule fill_rule = st.getFillRule() ;
 
@@ -396,7 +392,7 @@ void RenderingContext::setPaint(Element &e)
         string ps_id = fill_paint.serverId() ;
         Element *elem = e.document().resolve(ps_id) ;
 
-        float fill_opacity = st.getFillOpacity() ;
+        float fill_opacity = st.getFillOpacity() * opacity_.back() ;
 
         if ( elem ) {
             if ( auto p = dynamic_cast<LinearGradientElement *>(elem) ) {
@@ -419,13 +415,95 @@ void RenderingContext::postRenderShape()
     popState() ;
 }
 
+#if 0
+
+class ClipCanvas: public Canvas {
+public:
+    ClipCanvas(Canvas &src): Canvas(src.width(), src.height(), src.dpiX(), src.dpiY()) {
+            surf_ = cairo_surface_create_similar(src.surf_,  CAIRO_CONTENT_COLOR, src.width(), src.height()) ;
+            cr_ = cairo_create(surf_) ;
+        }
+
+    void saveImage(const std::string &p) {
+        cairo_surface_write_to_png(surf_, p.c_str()) ;
+    }
+
+};
+
+
+
 void RenderingContext::applyClipPath(ClipPathElement *cp)
 {
-    RenderingContext clipCtx(canvas_, RenderingMode::Cliping) ;
+    std::shared_ptr<ClipCanvas> clip_canvas(new ClipCanvas(canvas_)) ;
+//    clip_canvas.save() ;
+//    clip_canvas.setBrush(SolidBrush(NamedColor::black())) ;
+//    clip_canvas.drawRect(0, 0, canvas_.width(), canvas_.height()) ;
+ //   clip_canvas.restore() ;
+
+
+    RenderingContext clipCtx(*clip_canvas) ;
+    clipCtx.obbox_ = obbox_ ;
+
+    clipCtx.clip(*cp, cp->style()) ;
+
+    Style cst ;
+    cst.setFillPaint(FillPaint(NamedColor::white())) ;
+
+    clipCtx.pushState(cp->style()) ;
+    clipCtx.pushState(cst) ;
+
+    Matrix2d trs ;
+
+    if ( cp->clipPathUnits() == ClipPathUnits::ObjectBoundingBox ) {
+
+        trs.scale(obbox_.width(), obbox_.height()) ;
+        trs.translate(obbox_.x(), obbox_.y()) ;
+        clipCtx.pushTransform(trs) ;
+    }
+
+   // clipCtx.pushTransform(cp->trans()) ;
+
+    clip_canvas->save() ;
+    clip_canvas->setTransform(trs);
+    for( auto c: cp->children() ) {
+        clipCtx.clip(c.get()) ;
+    }
+
+    clip_canvas->restore() ;
+
+
+    xg::FillRule fr ;
+
+    if ( cp->style().getClipRule() == ClipRule::EvenOdd )
+        fr = xg::FillRule::EvenOdd ;
+    else
+        fr = xg::FillRule::NonZero ;
+
+    canvas_.setMask(clip_canvas) ;
+
+
+    //canvas_.setClipPath(clipCtx.clip_path_, fr) ;
+}
+#endif
+
+void RenderingContext::applyClipPath(ClipPathElement *cp)
+{
+    ImageCanvas clip_canvas(canvas_.width(), canvas_.height()) ;
+
+    RenderingContext clipCtx(clip_canvas, RenderingMode::Cliping) ;
+    clipCtx.obbox_ = obbox_ ;
 
     clipCtx.clip(*cp, cp->style()) ;
 
     clipCtx.pushState(cp->style()) ;
+
+    if ( cp->clipPathUnits() == ClipPathUnits::ObjectBoundingBox ) {
+        Matrix2d trs ;
+        trs.scale(obbox_.width(), obbox_.height()) ;
+        trs.translate(obbox_.x(), obbox_.y()) ;
+        clipCtx.pushTransform(trs) ;
+    }
+
     clipCtx.pushTransform(cp->trans()) ;
 
     for( auto c: cp->children() ) {
@@ -434,15 +512,13 @@ void RenderingContext::applyClipPath(ClipPathElement *cp)
 
     xg::FillRule fr ;
 
-    if ( cp->style().getFillRule() == FillRule::EvenOdd )
+    if ( cp->style().getClipRule() == ClipRule::EvenOdd )
         fr = xg::FillRule::EvenOdd ;
     else
         fr = xg::FillRule::NonZero ;
 
     canvas_.setClipPath(clipCtx.clip_path_, fr) ;
 }
-
-
 
 void RenderingContext::render(LineElement &e)
 {
@@ -793,14 +869,12 @@ void RenderingContext::render(TSpanElement &e)
 
     if ( rendering_mode_ == RenderingMode::Display ) {
         canvas_.save() ;
-        canvas_.setTransform(Matrix2d::translation(x + dx + ofx, y + dy + ofy)) ;
         canvas_.setFont(f) ;
-
+        preRenderShape(e, e.style(), Matrix2d::translation(x + dx + ofx, y + dy + ofy), Rectangle2d(0, 0, line.width(), line.height())) ;
         setPaint(e) ;
         canvas_.drawGlyphs(line.glyphs(), gpos) ;
-        canvas_.restore() ;
-
-        clip(e, st) ;
+        postRenderShape();
+        canvas_.restore();
     }
     else {
         pushTransform(Matrix2d::translation(x + dx, y + dy)) ;
@@ -928,7 +1002,11 @@ void RenderingContext::render(SymbolElement &e, double pw, double ph)
 
 void RenderingContext::render(GroupElement &g) {
     preRenderShape(g, g.style(), g.trans(), Rectangle2d()) ;
+
+    float opacity = g.style().getOpacity() ;
+    opacity_.push_back(opacity_.back() * opacity ) ;
     renderChildren(g) ;
+    opacity_.pop_back() ;
     postRenderShape() ;
 }
 

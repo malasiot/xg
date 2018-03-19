@@ -1,8 +1,6 @@
 -- Font fallback
--- Bounding box computation (e.g. for g elements)
--- Overflow (not inheritted)
--- Clip path (object bounding box)
--- Paths boolean (e.g. using clipper)
+-- Clip path (?)
+-- Opacity
 -- Masks and Filters
 -- Glyph and text rendering
 -- external references

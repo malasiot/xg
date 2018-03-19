@@ -243,7 +243,9 @@ Image Image::loadPNG(const string &filename) {
     FILE *fp = fopen(filename.c_str(), "rb") ;
     if ( !fp ) return Image() ;
     PNGFileReader reader(fp) ;
-    return png_read(reader) ;
+    Image res = png_read(reader) ;
+    fclose(fp) ;
+    return res ;
 }
 
 Image Image::loadPNGBuffer(const string &buffer)
@@ -257,7 +259,9 @@ bool Image::saveToPNG(const string &filename) {
     FILE *fp = fopen(filename.c_str(), "wb") ;
     if ( !fp ) return false ;
     PNGFileWriter w(fp) ;
-    return png_write(w) ;
+    bool res = png_write(w) ;
+    fclose(fp) ;
+    return res ;
 }
 
 bool Image::saveToPNGBuffer(string &buffer) {

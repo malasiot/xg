@@ -5,7 +5,7 @@
 
 namespace xg {
 
-enum class ImageFormat { ARGB32, RGB24 } ;
+enum class ImageFormat { ARGB32, RGB24, A8 } ;
 
 class Image {
 

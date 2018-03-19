@@ -90,6 +90,9 @@ struct FillPaint: public Paint {
     FillPaint(): Paint(PaintType::SolidColor) {
         clr_or_server_id_.set<CSSColor>(0, 0, 0) ;
     }
+    FillPaint(const CSSColor &clr): Paint(PaintType::SolidColor) {
+        clr_or_server_id_.set<CSSColor>(clr) ;
+    }
 } ;
 
 struct StrokePaint: public Paint {

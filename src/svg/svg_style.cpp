@@ -304,6 +304,7 @@ Style::Style(const Style &other) {
     SVG_STYLE_ATTRIBUTE_INHERIT(fill_paint_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(stroke_paint_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(fill_opacity_) ;
+
     SVG_STYLE_ATTRIBUTE_INHERIT(stroke_opacity_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(font_family_) ;
     SVG_STYLE_ATTRIBUTE_INHERIT(font_style_) ;

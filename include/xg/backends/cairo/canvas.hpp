@@ -27,6 +27,7 @@ public:
 
          std::shared_ptr<Pen> pen_ ;
          std::shared_ptr<Brush> brush_ ;
+         std::shared_ptr<Canvas> mask_ ;
          Font font_ ;
          Matrix2d trans_ ;
      };
