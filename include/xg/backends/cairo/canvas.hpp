@@ -16,8 +16,9 @@ namespace detail {
 
 class Backend {
 public:
-    cairo_t *cr_ = nullptr;
-    cairo_surface_t *surf_ = nullptr ;
+    cairo_t *source_cr_ = nullptr, *cr_ = nullptr;
+    cairo_surface_t *surf_ = nullptr , *proxy_surf_ = nullptr;
+    std::shared_ptr<Canvas> mask_ ;
 
     Backend() ;
     ~Backend() ;
@@ -27,7 +28,7 @@ public:
 
          std::shared_ptr<Pen> pen_ ;
          std::shared_ptr<Brush> brush_ ;
-         std::shared_ptr<Canvas> mask_ ;
+
          Font font_ ;
          Matrix2d trans_ ;
      };
@@ -36,6 +37,8 @@ public:
 
 protected:
 
+    void init() ;
+    void flush() ;
     void set_cairo_stroke(const Pen &pen) ;
     void cairo_apply_linear_gradient(const LinearGradientBrush &lg);
     void cairo_apply_radial_gradient(const RadialGradientBrush &rg);
@@ -46,6 +49,7 @@ protected:
     void rect_path(double x0, double y9, double w, double h) ;
     void path(const Path &path) ;
     void polyline_path(double *pts, int n, bool) ;
+    cairo_t *cr() ;
 
 } ;
 

@@ -18,10 +18,28 @@ void drawShape(Canvas &canvas, const Rectangle2d &rect) {
 
 int main(int argc, char *argv[]) {
 
+    std::shared_ptr<ImageCanvas> mask(new ImageCanvas(400, 400)) ;
+
+    mask->setBrush(SolidBrush(Color(0, 0, 0, 0))) ;
+    mask->drawRect(0, 0, 400, 400) ;
+    mask->setBrush(SolidBrush(NamedColor::white())) ;
+    mask->drawCircle(100, 100, 250) ;
+
+
+    mask->getImage().saveToPNG("/tmp/mask.png") ;
+
     ImageCanvas canvas(1024, 512) ;
+
+    canvas.setClipMask(mask) ;
+
+    canvas.setBrush(SolidBrush(Color(1, 1, 1, 1))) ;
+    canvas.drawRect(0, 0, 1024, 512) ;
 
     canvas.setPen(Pen()) ;
     canvas.setBrush(SolidBrush(NamedColor::blue())) ;
+
+    canvas.save() ;
+
 
     Rectangle2d rect(0, 0, 100, 100) ;
 
@@ -49,6 +67,7 @@ int main(int argc, char *argv[]) {
         }
 
 
+    canvas.restore() ;
 
     canvas.getImage().saveToPNG("/tmp/oo.png") ;
 

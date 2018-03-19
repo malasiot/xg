@@ -27,6 +27,7 @@ class Canvas: public detail::Backend {
 protected:
 
     Canvas(double width, double height, double dpix, double dpiy) ;
+    ~Canvas() ;
 
     Canvas(Canvas &&op) noexcept = default ;
     Canvas& operator=(Canvas&& op) noexcept = default ;
@@ -52,9 +53,10 @@ public:
 
     void setClipRect(double x0, double y0, double w, double h) ;
     void setClipRect(const Rectangle2d &r) ;
+    void setClipMask(const std::shared_ptr<Canvas> &mask) ;
 
     void setClipPath(const Path &p, FillRule frule= FillRule::EvenOdd) ;
-    void setMask(std::shared_ptr<Canvas> mask) ;
+
 
     void drawLine(double x0, double y0, double x1, double y1) ;
     void drawLine(const Point2d &p1, const Point2d &p2) ;

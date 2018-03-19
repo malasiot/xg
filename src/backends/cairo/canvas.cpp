@@ -35,39 +35,42 @@ Backend::Backend() {
     state_.push(std::move(st)) ;
 }
 
+void Backend::init() {
+    cr_ = source_cr_ ;
+}
+
 void Backend::set_cairo_stroke(const Pen &pen) {
-    cairo_t *cr = (cairo_t *)cr_  ;
 
     const Color &clr = pen.lineColor() ;
 
-    if ( clr.a()  == 1.0 ) cairo_set_source_rgb(cr, clr.r(), clr.g(), clr.b()) ;
-    else cairo_set_source_rgba(cr, clr.r(), clr.g(), clr.b(), clr.a() ) ;
+    if ( clr.a()  == 1.0 ) cairo_set_source_rgb(cr(), clr.r(), clr.g(), clr.b()) ;
+    else cairo_set_source_rgba(cr(), clr.r(), clr.g(), clr.b(), clr.a() ) ;
 
-    cairo_set_line_width (cr, pen.lineWidth());
+    cairo_set_line_width (cr(), pen.lineWidth());
 
-    cairo_set_miter_limit (cr, pen.miterLimit()) ;
+    cairo_set_miter_limit (cr(), pen.miterLimit()) ;
 
     switch ( pen.lineCap() ) {
     case LineCap::Butt:
-        cairo_set_line_cap(cr, CAIRO_LINE_CAP_BUTT) ;
+        cairo_set_line_cap(cr(), CAIRO_LINE_CAP_BUTT) ;
         break ;
     case LineCap::Round:
-        cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND) ;
+        cairo_set_line_cap(cr(), CAIRO_LINE_CAP_ROUND) ;
         break ;
     case LineCap::Square:
-        cairo_set_line_cap(cr, CAIRO_LINE_CAP_SQUARE) ;
+        cairo_set_line_cap(cr(), CAIRO_LINE_CAP_SQUARE) ;
         break ;
     }
 
     switch ( pen.lineJoin() ) {
     case LineJoin::Miter:
-        cairo_set_line_join(cr, CAIRO_LINE_JOIN_MITER) ;
+        cairo_set_line_join(cr(), CAIRO_LINE_JOIN_MITER) ;
         break ;
     case LineJoin::Round:
-        cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND) ;
+        cairo_set_line_join(cr(), CAIRO_LINE_JOIN_ROUND) ;
         break ;
     case LineJoin::Bevel:
-        cairo_set_line_join(cr, CAIRO_LINE_JOIN_BEVEL) ;
+        cairo_set_line_join(cr(), CAIRO_LINE_JOIN_BEVEL) ;
         break ;
     }
 
@@ -76,13 +79,12 @@ void Backend::set_cairo_stroke(const Pen &pen) {
     const auto &dash_array = pen.dashArray() ;
 
     if ( dash_array.empty() )
-        cairo_set_dash(cr, 0, 0, 0) ;
+        cairo_set_dash(cr(), 0, 0, 0) ;
     else
-        cairo_set_dash(cr, &dash_array[0], dash_array.size(), dash_offset) ;
+        cairo_set_dash(cr(), &dash_array[0], dash_array.size(), dash_offset) ;
 }
 
 void Backend::cairo_apply_linear_gradient(const LinearGradientBrush &lg) {
-    cairo_t *cr = cr_  ;
     cairo_pattern_t *pattern;
     cairo_matrix_t matrix;
 
@@ -107,12 +109,11 @@ void Backend::cairo_apply_linear_gradient(const LinearGradientBrush &lg) {
         cairo_pattern_add_color_stop_rgba (pattern, stop.offset_, clr.r(), clr.g(), clr.b(), clr.a() * lg.fillOpacity() );
     }
 
-    cairo_set_source (cr, pattern);
+    cairo_set_source (cr(), pattern);
     cairo_pattern_destroy (pattern);
 }
 
 void Backend::cairo_apply_radial_gradient(const RadialGradientBrush &rg) {
-    cairo_t *cr = (cairo_t *)cr_  ;
     cairo_pattern_t *pattern;
     cairo_matrix_t matrix;
 
@@ -137,7 +138,7 @@ void Backend::cairo_apply_radial_gradient(const RadialGradientBrush &rg) {
         cairo_pattern_add_color_stop_rgba (pattern, stop.offset_, clr.r(), clr.g(), clr.b(), clr.a() * rg.fillOpacity() );
     }
 
-    cairo_set_source (cr, pattern);
+    cairo_set_source (cr(), pattern);
     cairo_pattern_destroy (pattern);
 }
 
@@ -163,7 +164,7 @@ void Backend::cairo_apply_pattern(const PatternBrush &pat) {
 
     cairo_pattern_set_filter (pattern, CAIRO_FILTER_BEST); //?
 
-    cairo_set_source (cr_, pattern);
+    cairo_set_source (cr(), pattern);
 
     cairo_pattern_destroy (pattern);
 }
@@ -173,25 +174,19 @@ void Backend::fill_stroke_shape() {
     const State &state = state_.top();
 
 
-
     if ( state.brush_ )  {
         const auto &br = state.brush_ ;
 
         set_cairo_fill(br) ;
 
-        if ( state.mask_ ) {
-            cairo_mask_surface(cr_, state.mask_->surf_, 0, 0) ;
-        }
-
-
-        if ( state.pen_  ) cairo_fill_preserve(cr_) ;
-        else cairo_fill (cr_);
+        if ( state.pen_  ) cairo_fill_preserve(cr()) ;
+        else cairo_fill (cr());
     }
 
     if ( state.pen_ )  {
         const Pen &pen = *state.pen_ ;
         set_cairo_stroke(pen) ;
-        cairo_stroke(cr_) ;
+        cairo_stroke(cr()) ;
     }
 
 
@@ -201,16 +196,16 @@ void Backend::fill_stroke_shape() {
 void Backend::set_cairo_fill(const std::shared_ptr<Brush> &br) {
 
     if ( br->fillRule() == FillRule::EvenOdd)
-        cairo_set_fill_rule (cr_, CAIRO_FILL_RULE_EVEN_ODD);
+        cairo_set_fill_rule (cr(), CAIRO_FILL_RULE_EVEN_ODD);
     else if ( br->fillRule() == FillRule::NonZero )
-        cairo_set_fill_rule (cr_, CAIRO_FILL_RULE_WINDING);
+        cairo_set_fill_rule (cr(), CAIRO_FILL_RULE_WINDING);
 
     if ( const auto &brush = dynamic_cast<SolidBrush *>(br.get()) )
     {
         const Color &clr = brush->color() ;
 
-        if ( clr.a() * br->fillOpacity()  == 1.0 ) cairo_set_source_rgb(cr_, clr.r(), clr.g(), clr.b()) ;
-        else cairo_set_source_rgba(cr_, clr.r(), clr.g(), clr.b(), clr.a() * br->fillOpacity() ) ;
+        if ( clr.a() * br->fillOpacity()  == 1.0 ) cairo_set_source_rgb(cr(), clr.r(), clr.g(), clr.b()) ;
+        else cairo_set_source_rgba(cr(), clr.r(), clr.g(), clr.b(), clr.a() * br->fillOpacity() ) ;
     }
     else if ( const auto &brush = dynamic_cast<LinearGradientBrush *>(br.get()) )
         cairo_apply_linear_gradient(*brush) ;
@@ -222,41 +217,45 @@ void Backend::set_cairo_fill(const std::shared_ptr<Brush> &br) {
 
 
 void Backend::line_path(double x0, double y0, double x1, double y1) {
-    cairo_move_to(cr_, x0, y0) ;
-    cairo_line_to(cr_, x1, y1) ;
+    cairo_move_to(cr(), x0, y0) ;
+    cairo_line_to(cr(), x1, y1) ;
 }
 
 void Backend::polyline_path(double *pts, int n, bool close) {
     if ( n < 2 ) return ;
 
-    cairo_move_to(cr_, pts[0], pts[1]) ;
+    cairo_move_to(cr(), pts[0], pts[1]) ;
 
     for(int i=1, k=2 ; i<n ; i++, k+=2 )
-        cairo_line_to(cr_, pts[k], pts[k+1]) ;
+        cairo_line_to(cr(), pts[k], pts[k+1]) ;
 
-    if ( close ) cairo_close_path(cr_) ;
+    if ( close ) cairo_close_path(cr()) ;
+}
+
+cairo_t *Backend::cr() {
+    return cr_ ;
 }
 
 
 
 void Backend::path(const Path &path) {
 
-    cairo_new_path(cr_) ;
+    cairo_new_path(cr()) ;
 
     for( const auto &pcb: path.commands() ) {
 
         switch( pcb.cmd_ ) {
         case Path::MoveToCmd:
-            cairo_move_to(cr_, pcb.arg0_, pcb.arg1_) ;
+            cairo_move_to(cr(), pcb.arg0_, pcb.arg1_) ;
             break ;
         case Path::LineToCmd:
-            cairo_line_to(cr_, pcb.arg0_, pcb.arg1_) ;
+            cairo_line_to(cr(), pcb.arg0_, pcb.arg1_) ;
             break ;
         case Path::CurveToCmd:
-            cairo_curve_to(cr_, pcb.arg0_, pcb.arg1_, pcb.arg2_, pcb.arg3_, pcb.arg4_, pcb.arg5_) ;
+            cairo_curve_to(cr(), pcb.arg0_, pcb.arg1_, pcb.arg2_, pcb.arg3_, pcb.arg4_, pcb.arg5_) ;
             break ;
         case Path::ClosePathCmd:;
-            cairo_close_path(cr_) ;
+            cairo_close_path(cr()) ;
             break ;
         }
     }
@@ -264,8 +263,8 @@ void Backend::path(const Path &path) {
 
 
 void Backend::rect_path(double x0, double y0, double w, double h) {
-    cairo_rectangle(cr_, x0, y0, w, h);
- }
+    cairo_rectangle(cr(), x0, y0, w, h);
+}
 
 cairo_surface_t *cairo_create_image_surface(const Image &im)
 {
@@ -343,11 +342,30 @@ cairo_surface_t *cairo_create_image_surface(const Image &im)
     return psurf ;
 }
 
+void Backend::flush() {
+
+    if ( proxy_surf_ ) {
+        // apply the mask and copy to surface
+
+        cairo_set_source_surface(source_cr_, proxy_surf_, 0, 0);
+        cairo_mask_surface(source_cr_, mask_->surf_, 0, 0) ;
+        cairo_fill(source_cr_) ;
+        cairo_surface_destroy(proxy_surf_) ;
+        proxy_surf_ = nullptr ;
+    }
+
+    cairo_surface_flush(surf_) ;
+
+
+}
 
 Backend::~Backend() {
+
+    flush() ;
+
     cairo_surface_finish (surf_);
     cairo_surface_destroy (surf_);
-    cairo_destroy(cr_) ;
+    cairo_destroy(source_cr_) ;
 }
 
 
@@ -375,14 +393,16 @@ void Canvas::setBrush(const PatternBrush &br) {
 }
 
 void Canvas::save() {
-    cairo_save(cr_) ;
+    cairo_save(cr()) ;
     state_.push(state_.top()) ;
 }
 
 void Canvas::restore() 	{
-    cairo_restore(cr_) ;
+    cairo_restore(cr()) ;
     state_.pop() ;
 }
+
+
 
 
 void Canvas::setFont(const Font &font) {
@@ -444,18 +464,18 @@ void Canvas::drawText(const std::string &text, double x0, double y0, double widt
             gx +=  g.x_advance_;
         }
 
-        cairo_save(cr_) ;
+        cairo_save(cr()) ;
 
-        cairo_set_scaled_font(cr_, scaled_font) ;
+        cairo_set_scaled_font(cr(), scaled_font) ;
 
-        cairo_translate(cr_, x0 + tx, y0 + y + ty) ;
+        cairo_translate(cr(), x0 + tx, y0 + y + ty) ;
 
-  //      cairo_show_glyphs(cr_, cairo_glyphs, num_glyphs) ;
-        cairo_glyph_path(cr_, cairo_glyphs, num_glyphs);
+        //      cairo_show_glyphs(cr_, cairo_glyphs, num_glyphs) ;
+        cairo_glyph_path(cr(), cairo_glyphs, num_glyphs);
 
-        cairo_fill(cr_) ;
+        cairo_fill(cr()) ;
 
-   //     fill_stroke_shape() ;
+        //     fill_stroke_shape() ;
 #if 0
         cairo_rectangle(cr_, 0, 0, layout.width(), -line.ascent_) ;
         cairo_rectangle(cr_, 0, 0, layout.width(), line.descent_) ;
@@ -467,13 +487,13 @@ void Canvas::drawText(const std::string &text, double x0, double y0, double widt
 
         cairo_stroke(cr_) ;
 #endif
-        cairo_restore(cr_) ;
+        cairo_restore(cr()) ;
 
         cairo_glyph_free(cairo_glyphs) ;
 
     }
 
-     cairo_scaled_font_destroy(scaled_font) ;
+    cairo_scaled_font_destroy(scaled_font) ;
 }
 
 void Canvas::drawText(const string &textStr, const Point2d &p) {
@@ -511,27 +531,27 @@ void Canvas::drawText(const std::string &text, double x0, double y0)
     }
 
     cairo_scaled_font_t *scaled_font = FontManager::instance().createFont(f) ;
-     cairo_set_scaled_font(cr_, scaled_font) ;
+    cairo_set_scaled_font(cr(), scaled_font) ;
 
-    cairo_save(cr_) ;
+    cairo_save(cr()) ;
 
 
-    cairo_translate(cr_, x0, y0) ;
+    cairo_translate(cr(), x0, y0) ;
 
-    cairo_glyph_path(cr_, cairo_glyphs, num_glyphs);
+    cairo_glyph_path(cr(), cairo_glyphs, num_glyphs);
 
-    cairo_fill(cr_) ;
+    cairo_fill(cr()) ;
 #if 0
-        cairo_rectangle(cr_, 0, 0, layout.width(), -line.ascent_) ;
-        cairo_rectangle(cr_, 0, 0, layout.width(), line.descent_) ;
+    cairo_rectangle(cr_, 0, 0, layout.width(), -line.ascent_) ;
+    cairo_rectangle(cr_, 0, 0, layout.width(), line.descent_) ;
 #endif
 
 #if 0
-        cairo_set_source_rgb(cr_, 1, 0, 0) ;
+    cairo_set_source_rgb(cr_, 1, 0, 0) ;
 
-        cairo_stroke(cr_) ;
+    cairo_stroke(cr_) ;
 #endif
-    cairo_restore(cr_) ;
+    cairo_restore(cr()) ;
 
     cairo_glyph_free(cairo_glyphs) ;
 
@@ -559,15 +579,15 @@ void Canvas::drawGlyphs(const vector<Glyph> &glyphs, const vector<Point2d> &gpos
         cairo_glyphs[i].y = gpos[i].y() ;
     }
 
-    cairo_save(cr_) ;
+    cairo_save(cr()) ;
 
-    cairo_set_scaled_font(cr_, scaled_font) ;
+    cairo_set_scaled_font(cr(), scaled_font) ;
 
-    cairo_glyph_path(cr_, cairo_glyphs, num_glyphs);
+    cairo_glyph_path(cr(), cairo_glyphs, num_glyphs);
 
     fill_stroke_shape();
 
-    cairo_restore(cr_) ;
+    cairo_restore(cr()) ;
 
     cairo_glyph_free(cairo_glyphs) ;
 
@@ -587,10 +607,17 @@ void Canvas::setClipRect(const Rectangle2d &r)
     setClipRect(r.x(), r.y(), r.width(), r.height()) ;
 }
 
+void Canvas::setClipMask(const std::shared_ptr<Canvas> &mask) {
+    mask_ = mask ;
+    proxy_surf_ = cairo_surface_create_similar(surf_, CAIRO_CONTENT_COLOR_ALPHA, width_, height_) ;
+    cairo_t *cr = cairo_create(proxy_surf_) ;
+    cr_ = cr ;
+}
+
 void Canvas::setClipRect(double x0, double y0, double w, double h)
 {
-    cairo_rectangle(cr_, x0, y0, w, h) ;
-    cairo_clip(cr_) ;
+    cairo_rectangle(cr(), x0, y0, w, h) ;
+    cairo_clip(cr()) ;
 }
 
 void Canvas::setClipPath(const Path &p, FillRule rule)
@@ -598,16 +625,11 @@ void Canvas::setClipPath(const Path &p, FillRule rule)
     path(p) ;
 
     if ( rule == FillRule::EvenOdd )
-        cairo_set_fill_rule(cr_, CAIRO_FILL_RULE_EVEN_ODD) ;
+        cairo_set_fill_rule(cr(), CAIRO_FILL_RULE_EVEN_ODD) ;
     else
-        cairo_set_fill_rule(cr_, CAIRO_FILL_RULE_WINDING) ;
+        cairo_set_fill_rule(cr(), CAIRO_FILL_RULE_WINDING) ;
 
-    cairo_clip(cr_) ;
-}
-
-void Canvas::setMask(std::shared_ptr<Canvas> mask)
-{
-     state_.top().mask_ = mask ;
+    cairo_clip(cr()) ;
 }
 
 void Canvas::drawLine(double x0, double y0, double x1, double y1) {
@@ -647,7 +669,7 @@ void Canvas::drawPath(const Path &p) {
 
 void Canvas::drawCircle(double cx, double cy, double r)
 {
-    cairo_arc (cr_, cx, cy, r, 0.0, 2*M_PI) ;
+    cairo_arc (cr(), cx, cy, r, 0.0, 2*M_PI) ;
     fill_stroke_shape() ;
 }
 
@@ -705,27 +727,34 @@ static void cairo_elliptical_arc_to(cairo_t *cr, double x2, double y2)
 
 void Canvas::drawEllipse(double xp, double yp, double rxp, double ryp) {
 
-    cairo_move_to(cr_, xp, yp - ryp) ;
-    cairo_elliptical_arc_to(cr_, xp + rxp, yp) ;
-    cairo_elliptical_arc_to(cr_, xp, yp + ryp) ;
-    cairo_elliptical_arc_to(cr_, xp - rxp, yp) ;
-    cairo_elliptical_arc_to(cr_, xp , yp - ryp) ;
+    cairo_move_to(cr(), xp, yp - ryp) ;
+    cairo_elliptical_arc_to(cr(), xp + rxp, yp) ;
+    cairo_elliptical_arc_to(cr(), xp, yp + ryp) ;
+    cairo_elliptical_arc_to(cr(), xp - rxp, yp) ;
+    cairo_elliptical_arc_to(cr(), xp , yp - ryp) ;
 
     fill_stroke_shape() ;
 }
 
 
 Canvas::Canvas(double width, double height, double dpix, double dpiy): width_(width), height_(height), dpi_x_(dpix), dpi_y_(dpiy) {
+
+}
+
+Canvas::~Canvas()
+{
+
 }
 
 ImageCanvas::ImageCanvas(double w, double h, double dpi): Canvas(w, h, dpi, dpi) {
     surf_ = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h) ;
-    cr_ = cairo_create(surf_) ;
+    source_cr_ = cairo_create(surf_) ;
+    init() ;
 }
 
 Image ImageCanvas::getImage()
 {
-    cairo_surface_flush(surf_) ;
+    flush() ;
 
     char *src = (char *)cairo_image_surface_get_data(surf_) ;
     unsigned width = cairo_image_surface_get_width(surf_) ;
@@ -763,32 +792,32 @@ void Canvas::drawImage(const Image &im,  double opacity )
 {
     cairo_surface_t *imsurf = detail::cairo_create_image_surface(im) ;
 
-    cairo_save(cr_) ;
+    cairo_save(cr()) ;
 
-    cairo_set_source_surface(cr_, (cairo_surface_t *)imsurf, 0, 0);
+    cairo_set_source_surface(cr(), (cairo_surface_t *)imsurf, 0, 0);
 
-    cairo_paint_with_alpha (cr_, opacity);
+    cairo_paint_with_alpha (cr(), opacity);
 
     cairo_surface_destroy(imsurf) ;
 }
 
 
 void Canvas::setTransform(const Matrix2d &tr) {
-    cairo_push_transform(cr_, tr) ;
+    cairo_push_transform(cr(), tr) ;
 }
 
 void Canvas::setAntialias(bool anti_alias)
 {
     if ( anti_alias )
-        cairo_set_antialias (cr_, CAIRO_ANTIALIAS_DEFAULT);
+        cairo_set_antialias (cr(), CAIRO_ANTIALIAS_DEFAULT);
     else
-        cairo_set_antialias (cr_, CAIRO_ANTIALIAS_NONE);
+        cairo_set_antialias (cr(), CAIRO_ANTIALIAS_NONE);
 }
 
 PatternCanvas::PatternCanvas(double width, double height): Canvas(width, height, 92, 92) {
     cairo_rectangle_t r{0, 0, width, height} ;
     surf_ = cairo_recording_surface_create(CAIRO_CONTENT_COLOR_ALPHA, &r) ;
-    cr_ = cairo_create(surf_) ;
+    source_cr_ = cairo_create(surf_) ;
 }
 
 
