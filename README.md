@@ -12,8 +12,7 @@ SVG support includes:
 + Container support: svg, g, use, symbol
 + Clipping: not supporting ORing of clipping shapes.
 + Styling: presentation attributes only
-+ Rudimentary text rendering: font selection, shaping with Hurfbuzz
-..+ Only single x, y, dx, dy attribute handled.
-..+ text-anchor works only for simple text (not sequence of TSpans)
-..+ No vertical text
++ Rudimentary text rendering: font selection, shaping with Hurfbuzz (
+only single x, y, dx, dy attribute handled, text-anchor works only for simple text, not sequence of TSpans,
+no vertical text, text decorations etc.)
 + No masks, filters, markers and group opacity.
