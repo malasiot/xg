@@ -1,5 +1,8 @@
 #include <cairo/cairo.h>
 
+#include <string>
+#include <algorithm>
+
 void draw_gradient1(cairo_t *cr)
 {
   cairo_pattern_t *pat1;
@@ -23,7 +26,9 @@ void draw_gradient1(cairo_t *cr)
   cairo_pattern_destroy(pat1);
 }
 
+
 int main(int argc, char *argv[]) {
+
 
     // create source surface
 

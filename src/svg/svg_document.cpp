@@ -27,6 +27,10 @@ void SVGDocument::readStream(std::istream &strm) {
     parser.parseStream(strm) ;
 }
 
+void SVGDocument::setLocalResourceFolder(const string &folder) {
+    resource_folder_ = folder ;
+}
+
 void SVGDocument::registerNamedElement(const string &id, svg::Element *e) {
     elements_.insert({"#" + id, e}) ;
 }
@@ -51,13 +55,22 @@ Image SVGDocument::loadImageResource(const string &uri, svg::Element *container)
         auto image =  Image::loadPNGBuffer(png_data) ;
         cached_images_[container] = image ;
         return image ;
+    } else {
+        if ( endsWith(uri, ".png") ) {
+            Image im = Image::loadPNG(resource_folder_ + '/' + uri) ;
+            return im ;
+        }
+        else if ( endsWith(uri, ".svg") ) {
+            return Image() ;
+        }
+
     }
 }
 
 void Canvas::drawSVG(const SVGDocument &doc)
 {
     svg::RenderingContext ctx(*this) ;
-    auto root = std::dynamic_pointer_cast<svg::SVGElement>(doc.root_) ;
+    auto root = std::dynamic_pointer_cast<svg::SVGElement>(doc.getDOM()) ;
     ctx.render(*root) ;
 }
 

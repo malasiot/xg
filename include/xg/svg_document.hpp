@@ -15,24 +15,29 @@ class SVGElement ;
 class Element ;
 }
 
+
 // Encapsulates the SVG dom
 class SVGDocument {
 public:
 
     void readStream(std::istream &strm) ;
 
+    void setLocalResourceFolder(const std::string &folder) ;
+
     void registerNamedElement(const std::string &id, svg::Element *e);
 
     svg::Element *resolve(const std::string &uri) const ;
     Image loadImageResource(const std::string &uri, svg::Element *container) ;
 
+    std::shared_ptr<svg::SVGElement> getDOM() const { return root_ ; }
+
 
 private:
 
     friend class SVGParser;
-    friend class Canvas ;
 
     std::shared_ptr<svg::SVGElement> root_ ;
+    std::string resource_folder_ ;
 
 protected:
 
