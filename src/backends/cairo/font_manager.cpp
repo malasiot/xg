@@ -73,8 +73,16 @@ cairo_font_face_t *FontManager::queryFace(const std::string &family_name, FontSt
 
     cairo_font_options_t *font_options =  cairo_font_options_create ();
 
-    // more recent versions of cairo support advanced text rendering options
-    cairo_font_options_set_antialias(font_options, CAIRO_ANTIALIAS_DEFAULT) ;
+
+    //cairo_font_options_set_antialias(font_options, CAIRO_ANTIALIAS_DEFAULT) ;
+
+
+    cairo_font_options_set_antialias (font_options, CAIRO_ANTIALIAS_SUBPIXEL);
+    cairo_font_options_set_hint_style (font_options, CAIRO_HINT_STYLE_FULL);
+    cairo_font_options_set_hint_metrics (font_options, CAIRO_HINT_METRICS_ON);
+    cairo_font_options_set_subpixel_order (font_options, CAIRO_SUBPIXEL_ORDER_RGB);
+
+    cairo_font_options_destroy (font_options);
 
     cairo_ft_font_options_substitute(font_options, pat) ;
 
@@ -115,7 +123,10 @@ cairo_font_face_t *FontManager::queryFace(const std::string &family_name, FontSt
 
 cairo_scaled_font_t *FontManager::createFont(const Font &font)
 {
-    for( const auto &family: font.familyNames() ) {
+    vector<string> q_family_names(font.familyNames()) ;
+    q_family_names.emplace_back("serif") ; // fallback family (OS dependent)
+
+    for( const auto &family: q_family_names ) {
         cairo_font_face_t *face = FontManager::instance().queryFace(family, font.style(), font.weight()) ;
         if ( face ) {
             // create scaled font
@@ -128,7 +139,7 @@ cairo_scaled_font_t *FontManager::createFont(const Font &font)
             cairo_matrix_init_identity (&ctm);
             cairo_matrix_init_scale (&font_matrix, font_size, font_size);
             font_options = cairo_font_options_create ();
-           cairo_font_options_set_hint_style (font_options, CAIRO_HINT_STYLE_FULL);
+            cairo_font_options_set_hint_style (font_options, CAIRO_HINT_STYLE_MEDIUM);
             cairo_font_options_set_hint_metrics (font_options, CAIRO_HINT_METRICS_OFF);
 
             cairo_scaled_font_t *scaled_font = cairo_scaled_font_create (face,

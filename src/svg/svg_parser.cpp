@@ -58,7 +58,19 @@ void SVGParser::parseStream(std::istream &strm, size_t buffer_size) {
     } while (!done);
 }
 
+void SVGParser::handleCharacterData() {
+    if ( text_.empty() ) return ;
+    string normalized = processWhiteSpace(text_) ;
+
+    if ( !normalized.empty() ) characters(normalized) ;
+
+    text_.clear() ;
+
+}
+
 void SVGParser::beginElement(const string &name, const Dictionary &attributes) {
+
+    handleCharacterData();
 
     elements_.push_back(name) ;
 
@@ -114,6 +126,9 @@ void SVGParser::beginElement(const string &name, const Dictionary &attributes) {
 }
 
 void SVGParser::endElement() {
+
+    handleCharacterData();
+
     nodes_.pop_back() ;
     elements_.pop_back() ;
 }
@@ -159,7 +174,10 @@ void SVGParser::end_element_handler(void *data, const char *) {
     ctx->parser_.endElement() ;
 }
 
-string SVGParser::processWhiteSpace(const char *character_data, int length) {
+string SVGParser::processWhiteSpace(const string &src) {
+
+    const char *character_data = src.c_str() ;
+    int length = src.length() ;
 
     string text ;
 
@@ -201,8 +219,7 @@ string SVGParser::processWhiteSpace(const char *character_data, int length) {
 void SVGParser::character_data_handler(void *data, const char *character_data, int length) {
     SVGParserContext *ctx = (SVGParserContext *)data ;
 
-    string text = ctx->parser_.processWhiteSpace(character_data, length) ;
+    ctx->parser_.text_.append(character_data, character_data + length) ;
 
-    if ( !text.empty() ) ctx->parser_.characters(text) ;
 }
 }

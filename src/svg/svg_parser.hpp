@@ -52,7 +52,9 @@ private:
     static void end_element_handler(void *data, const char *elelemnt_name);
     static void character_data_handler(void *data, const char *character_data, int length);
 
-    std::string processWhiteSpace(const char *character_data, int length);
+    void handleCharacterData() ;
+
+    std::string processWhiteSpace(const std::string &);
 
 private:
 

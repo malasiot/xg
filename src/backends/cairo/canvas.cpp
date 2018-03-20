@@ -808,10 +808,13 @@ void Canvas::setTransform(const Matrix2d &tr) {
 
 void Canvas::setAntialias(bool anti_alias)
 {
-    if ( anti_alias )
-        cairo_set_antialias (cr(), CAIRO_ANTIALIAS_DEFAULT);
+    if ( anti_alias ) {
+        cairo_set_antialias (cr(), CAIRO_ANTIALIAS_BEST);
+
+
+    }
     else
-        cairo_set_antialias (cr(), CAIRO_ANTIALIAS_NONE);
+        cairo_set_antialias (cr(), CAIRO_ANTIALIAS_DEFAULT);
 }
 
 PatternCanvas::PatternCanvas(double width, double height): Canvas(width, height, 92, 92) {

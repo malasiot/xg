@@ -38,7 +38,7 @@ float RenderingContext::toPixels(const Length &l, LengthDirection dir, bool scal
     case LengthUnitType::PC:
         if ( dir == LengthDirection::Horizontal  ) return  l.value() * factor * dpi_x_ ;
         else if ( dir == LengthDirection::Vertical ) return  l.value() * factor * dpi_y_ ;
-        else if ( dir == LengthDirection::Absolute ) return  l.value() * factor*sqrt(dpi_x_ * dpi_y_) ;
+        else if ( dir == LengthDirection::Absolute ) return  l.value() * factor* dpi_y_ ;
     case LengthUnitType::EMS:
         return l.value() * font_sizes_.back() ;
     case LengthUnitType::EXS:
@@ -355,9 +355,9 @@ void RenderingContext::setPaint(Element &e)
         }
 
         float stroke_opacity = st.getStrokeOpacity() ;
-        float opacity = st.getOpacity() * opacity_.back();
+        float opacity = st.getOpacity() ;
         const CSSColor &css_clr = stroke_paint.color() ;
-        Color clr(css_clr, stroke_opacity) ;
+        Color clr(css_clr, stroke_opacity * opacity) ;
 
         pen.setColor(clr) ;
 
@@ -369,9 +369,9 @@ void RenderingContext::setPaint(Element &e)
     if ( fill_paint.type() == PaintType::None ) ;
     else if ( fill_paint.type() == PaintType::SolidColor ) {
         float fill_opacity = st.getFillOpacity() ;
-        float opacity = st.getOpacity() * opacity_.back() ;
+        float opacity = st.getOpacity() ;
         const CSSColor &css_clr = fill_paint.color() ;
-        Color clr(css_clr, fill_opacity) ;
+        Color clr(css_clr, fill_opacity * opacity) ;
 
 
         FillRule fill_rule = st.getFillRule() ;
@@ -392,7 +392,7 @@ void RenderingContext::setPaint(Element &e)
         string ps_id = fill_paint.serverId() ;
         Element *elem = e.document().resolve(ps_id) ;
 
-        float fill_opacity = st.getFillOpacity() * opacity_.back() ;
+        float fill_opacity = st.getFillOpacity() * st.getOpacity() ;
 
         if ( elem ) {
             if ( auto p = dynamic_cast<LinearGradientElement *>(elem) ) {
@@ -805,6 +805,7 @@ void RenderingContext::render(TextElement &e)
     cursor_y_ = y + dy ;
 
     for( auto &c: e.children() ) {
+
         if ( auto p = std::dynamic_pointer_cast<TSpanElement>(c) ) {
             render(*p) ;
         }
@@ -828,8 +829,15 @@ void RenderingContext::render(TSpanElement &e)
 
     double x, y, dx, dy ;
 
-    x = ( e.xIsSet() ) ? toPixels(e.x(), LengthDirection::Horizontal) : cursor_x_ ;
-    y = ( e.yIsSet() ) ? toPixels(e.y(), LengthDirection::Vertical) : cursor_y_ ;
+    if ( e.xIsSet() )
+        cursor_x_ = x = toPixels(e.x(), LengthDirection::Horizontal) ;
+    else
+        x = cursor_x_ ;
+
+    if ( e.yIsSet() )
+        cursor_y_ = y = toPixels(e.y(), LengthDirection::Vertical) ;
+    else
+        y = cursor_y_ ;
 
     dx = toPixels(e.dx(), LengthDirection::Horizontal) ;
     dy = toPixels(e.dy(), LengthDirection::Vertical) ;
@@ -845,14 +853,12 @@ void RenderingContext::render(TSpanElement &e)
 
     const auto &line = tl.lines()[0] ;
 
-
     double ofx = 0, ofy = 0 ;
 
     if ( st.getTextAnchor() == TextAnchor::Middle )
         ofx = -line.width()/2 ;
     else if ( st.getTextAnchor() == TextAnchor::End )
         ofx = -line.width() ;
-
 
     vector<Point2d> gpos ;
 
@@ -864,7 +870,7 @@ void RenderingContext::render(TSpanElement &e)
 
     obbox_ = Rectangle2d(x + dx, y + dy, line.width(), line.height()) ;
 
-    cursor_x_ += gx + dx ;
+    cursor_x_ += gx + dx + ofx ;
     cursor_y_ += dy ;
 
     if ( rendering_mode_ == RenderingMode::Display ) {
@@ -917,6 +923,7 @@ void RenderingContext::render(Element *e) {
     else if ( auto p = dynamic_cast<RectElement *>(e) ) render(*p) ;
     else if ( auto p = dynamic_cast<PathElement *>(e) ) render(*p) ;
     else if ( auto p = dynamic_cast<PolygonElement *>(e) ) render(*p) ;
+    else if ( auto p = dynamic_cast<LineElement *>(e) ) render(*p) ;
     else if ( auto p = dynamic_cast<PolylineElement *>(e) ) render(*p) ;
     else if ( auto p = dynamic_cast<CircleElement *>(e) ) render(*p) ;
     else if ( auto p = dynamic_cast<EllipseElement *>(e) ) render(*p) ;
@@ -1002,11 +1009,7 @@ void RenderingContext::render(SymbolElement &e, double pw, double ph)
 
 void RenderingContext::render(GroupElement &g) {
     preRenderShape(g, g.style(), g.trans(), Rectangle2d()) ;
-
-    float opacity = g.style().getOpacity() ;
-    opacity_.push_back(opacity_.back() * opacity ) ;
     renderChildren(g) ;
-    opacity_.pop_back() ;
     postRenderShape() ;
 }
 
